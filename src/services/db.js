@@ -3,6 +3,7 @@ const mysql = require("mysql2/promise");
 let mysqlPool = null;
 let usersTableReady = false;
 let categoriesTableReady = false;
+let skinsTableReady = false;
 
 function getMysqlPool() {
   if (mysqlPool) return mysqlPool;
@@ -44,6 +45,21 @@ async function columnExists(pool, tableName, columnName) {
     [tableName, columnName]
   );
   return Array.isArray(rows) && rows[0] && Number(rows[0].cnt) > 0;
+}
+
+async function getColumnDataType(pool, tableName, columnName) {
+  const [rows] = await pool.query(
+    `
+      SELECT DATA_TYPE AS dt
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND COLUMN_NAME = ?
+      LIMIT 1
+    `,
+    [tableName, columnName]
+  );
+  return Array.isArray(rows) && rows[0] && rows[0].dt ? String(rows[0].dt).toLowerCase() : null;
 }
 
 async function indexExists(pool, tableName, indexName) {
@@ -156,6 +172,246 @@ function resetUsersTableCache() {
 
 function resetCategoriesTableCache() {
   categoriesTableReady = false;
+}
+
+function resetSkinsTableCache() {
+  skinsTableReady = false;
+}
+
+async function migrateSkinsTableIfNeeded(pool) {
+  const table = "skins";
+  if (!(await columnExists(pool, table, "creator_user_id"))) {
+    await pool.query(
+      `ALTER TABLE \`${table}\` ADD COLUMN creator_user_id BIGINT UNSIGNED NULL AFTER thumb_url`
+    );
+  }
+  if (!(await indexExists(pool, table, "idx_creator_user"))) {
+    try {
+      await pool.query(`ALTER TABLE \`${table}\` ADD KEY idx_creator_user (creator_user_id)`);
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error("Could not add idx_creator_user:", msg);
+    }
+  }
+
+  const typeDt = await getColumnDataType(pool, table, "type");
+  if (typeDt === "varchar" || typeDt === "char" || typeDt === "text") {
+    try {
+      await pool.query(`ALTER TABLE \`${table}\` MODIFY COLUMN \`type\` SMALLINT NOT NULL`);
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error(
+        "Could not migrate skins.type to SMALLINT (non-numeric values in type column?). Fix manually:",
+        msg
+      );
+    }
+  }
+}
+
+async function ensureSkinsTable() {
+  if (skinsTableReady) return;
+
+  const pool = getMysqlPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS skins (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      type SMALLINT NOT NULL,
+      price DECIMAL(10, 2) NOT NULL,
+      is_member_exclusive TINYINT(1) NOT NULL DEFAULT 0,
+      image_url VARCHAR(2048) NOT NULL,
+      thumb_url VARCHAR(2048) NOT NULL,
+      creator_user_id BIGINT UNSIGNED NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_type (type),
+      KEY idx_created_at (created_at),
+      KEY idx_creator_user (creator_user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await migrateSkinsTableIfNeeded(pool);
+
+  skinsTableReady = true;
+}
+
+async function insertSkin({
+  name,
+  type,
+  price,
+  isMemberExclusive,
+  imageUrl,
+  thumbUrl,
+  creatorUserId,
+}) {
+  const runOnce = async () => {
+    await ensureSkinsTable();
+    const pool = getMysqlPool();
+
+    const [result] = await pool.query(
+      `
+      INSERT INTO skins (name, type, price, is_member_exclusive, image_url, thumb_url, creator_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        name,
+        type,
+        price,
+        isMemberExclusive ? 1 : 0,
+        imageUrl,
+        thumbUrl,
+        creatorUserId === undefined || creatorUserId === null ? null : creatorUserId,
+      ]
+    );
+
+    const insertedId = result && result.insertId ? Number(result.insertId) : 0;
+    const [rows] = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        type,
+        price,
+        is_member_exclusive AS isMemberExclusive,
+        image_url AS imageUrl,
+        thumb_url AS thumbUrl,
+        creator_user_id AS creatorUserId,
+        created_at AS createdAt
+      FROM skins
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [insertedId]
+    );
+
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (row && Object.prototype.hasOwnProperty.call(row, "isMemberExclusive")) {
+      row.isMemberExclusive = Boolean(Number(row.isMemberExclusive));
+    }
+    if (row && Object.prototype.hasOwnProperty.call(row, "type")) {
+      row.type = Number(row.type);
+    }
+    return row;
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetSkinsTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
+async function listSkins(filters) {
+  const typeFilter =
+    filters && typeof filters.type === "number" && Number.isInteger(filters.type)
+      ? filters.type
+      : null;
+  const creator = filters && filters.creatorUserIdFilter;
+
+  const page =
+    filters &&
+    typeof filters.page === "number" &&
+    Number.isInteger(filters.page) &&
+    filters.page >= 1
+      ? filters.page
+      : 1;
+  const pageSize =
+    filters &&
+    typeof filters.pageSize === "number" &&
+    Number.isInteger(filters.pageSize) &&
+    filters.pageSize >= 1 &&
+    filters.pageSize <= 100
+      ? filters.pageSize
+      : 20;
+
+  const runOnce = async () => {
+    await ensureSkinsTable();
+    const pool = getMysqlPool();
+
+    const where = [];
+    const params = [];
+
+    if (typeFilter !== null) {
+      where.push("type = ?");
+      params.push(typeFilter);
+    }
+
+    if (creator && creator.kind === "eq") {
+      where.push("creator_user_id = ?");
+      params.push(creator.value);
+    } else if (creator && creator.kind === "null") {
+      where.push("creator_user_id IS NULL");
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM skins ${whereSql}`,
+      params
+    );
+    const total =
+      Array.isArray(countRows) && countRows[0] && countRows[0].cnt != null
+        ? Number(countRows[0].cnt)
+        : 0;
+
+    const offset = (page - 1) * pageSize;
+    const dataSql = `
+      SELECT
+        id,
+        name,
+        type,
+        price,
+        is_member_exclusive AS isMemberExclusive,
+        image_url AS imageUrl,
+        thumb_url AS thumbUrl,
+        creator_user_id AS creatorUserId,
+        created_at AS createdAt
+      FROM skins
+      ${whereSql}
+      ORDER BY id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await pool.query(dataSql, [...params, pageSize, offset]);
+    const list = Array.isArray(rows) ? rows : [];
+    for (const row of list) {
+      if (row && Object.prototype.hasOwnProperty.call(row, "isMemberExclusive")) {
+        row.isMemberExclusive = Boolean(Number(row.isMemberExclusive));
+      }
+      if (row && Object.prototype.hasOwnProperty.call(row, "type")) {
+        row.type = Number(row.type);
+      }
+    }
+
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+    return {
+      skins: list,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetSkinsTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
 }
 
 async function ensureCategoriesTable() {
@@ -330,14 +586,18 @@ async function initDatabaseIfConfigured() {
 
   await ensureUsersTable();
   await ensureCategoriesTable();
+  await ensureSkinsTable();
 }
 
 module.exports = {
   getMysqlPool,
   ensureUsersTable,
   ensureCategoriesTable,
+  ensureSkinsTable,
   insertCategory,
   listCategoriesByCreatorUserId,
+  insertSkin,
+  listSkins,
   upsertAppleUser,
   initDatabaseIfConfigured,
 };

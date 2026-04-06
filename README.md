@@ -3,7 +3,9 @@
 一个基于 Node.js 原生 `http` 的轻量后端示例，支持：
 
 - Apple ID 登录并签发业务 JWT
-- MySQL 连通性与表自动建表（`users`、`categories`）
+- MySQL 连通性与表自动建表（`users`、`categories`、`skins`）
+- 皮肤图片上传（原图 + 缩略图）、`skins` 表入库与列表查询
+- 本地上传目录的静态访问（`GET /uploads/...`）
 
 ## 目录结构
 
@@ -39,6 +41,7 @@ module.exports = { handleDemo };
 - 未命中当前路由时返回 `false`
 - 命中并完成响应后返回 `true`
 - 所有路由都不命中时，框架统一返回 `404`
+- JSON 接口通过 `sendJson` 设置 `Content-Type: application/json`；图片等二进制响应由对应路由自行设置头信息
 
 ## 当前接口目录
 
@@ -47,8 +50,11 @@ module.exports = { handleDemo };
 - `POST /echo`：回显 JSON Body
 - `GET /db/ping`：MySQL 连通性检查
 - `POST /auth/apple`：苹果登录校验 + 用户入库/更新 + 返回 JWT
-- `GET /categories`：获取当前用户类别列表（需 JWT，见下方说明）
-- `POST /categories`：创建类别（需 JWT，见下方说明）
+- `GET /categories`：获取当前用户类别列表（需 JWT）
+- `POST /categories`：创建类别（需 JWT）
+- `GET /skins`：皮肤列表（可选查询参数，见下文）
+- `POST /skins`：上传皮肤（multipart，需 JWT）
+- `GET /uploads/...`：读取本地上传文件（原图、缩略图等；路径需落在 `UPLOAD_ROOT` 内）
 
 ### `GET /categories`
 
@@ -64,6 +70,60 @@ module.exports = { handleDemo };
 - **成功响应**：`{ "category": { "id", "name", "creatorUserId", "createdAt", "updatedAt" } }`
 - **常见错误**：`401` 未带或无效 token；`400` 缺少 `name`；`409` 该用户已存在同名类别。
 
+### `GET /skins`
+
+- **鉴权**：无（公开列表；按需可在路由层自行加鉴权）。
+- **查询参数**（均可选，可组合）：
+  - **`type`**：`SMALLINT` 整数，范围 **-32768～32767**，按 `skins.type` 精确筛选；不传或空字符串表示不按类型筛选。
+  - **`creatorUserId`**：不传则不过滤创建者；传空或字面量 `null` 表示只查 **`creator_user_id IS NULL`**；传正整数表示只查该用户创建的皮肤。
+  - **分页**：
+    - **`page`**：页码，从 **1** 开始，默认 **1**。
+    - **`pageSize`** 或 **`limit`**：每页条数，**1～100**，默认 **20**；同时传 `pageSize` 与 `limit` 时以 **`pageSize`** 为准。
+- **成功响应**：
+  - `skins`：当前页数据数组（`creatorUserId` 可为 `null`）。
+  - `total`：满足筛选条件的总条数。
+  - `page`、`pageSize`：当前页码与每页条数。
+  - `totalPages`：总页数（无数据时为 **0**）。
+- **常见错误**：`400` 查询参数 `type`、`creatorUserId`、`page`、`pageSize` / `limit` 格式非法
+
+### `POST /skins`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求**：`multipart/form-data`。
+- **字段**：
+
+| 字段 | 说明 |
+|------|------|
+| `image` 或 `file` | 图片文件（必填），支持 jpeg / png / gif / webp，单文件约最大 10MB |
+| `name` | 皮肤名称（必填） |
+| `type` | 皮肤类型，**SMALLINT** 整数，**-32768～32767**；不传或空则默认为 **0** |
+| `price` | 价格，非负数字；不传或空则默认为 **0** |
+| `is_member_exclusive` | 是否会员专属：`1` / `true` / `yes` 为是，其它为否 |
+| `creatorUserId` 或 `creator_user_id` | 可选；正整数写入 `creator_user_id`，不传 / 空 / `null` 则存数据库 `NULL` |
+
+- **行为**：保存原图至 `UPLOAD_ROOT/skins/orig/`，生成缩略图至 `UPLOAD_ROOT/skins/thumb/`（JPEG）；写入表 **`skins`**，图片 URL 由 **`PUBLIC_BASE_URL`**（见环境变量）与固定路径拼接。
+- **成功响应**：`{ "skin": { 同上字段 } }`
+- **常见错误**：`401`；`400` 缺图、MIME 不支持、`type`（若提供）或 `price`（若提供）非法；`413` 文件过大
+
+### `GET /uploads/...`
+
+- 从 **`UPLOAD_ROOT`**（默认项目下 `uploads`）映射子路径，仅允许落在该目录内的文件；用于访问上传的原图与缩略图链接。
+
+### 表 `skins` 概要
+
+| 列 | 说明 |
+|----|------|
+| `id` | 自增主键 |
+| `name` | 名称 |
+| `type` | **SMALLINT**，类型编码 |
+| `price` | `DECIMAL(10,2)` |
+| `is_member_exclusive` | 是否会员专属 |
+| `image_url` / `thumb_url` | 原图与缩略图完整 URL |
+| `creator_user_id` | 可选，创建者 `users.id` |
+| `created_at` | 创建时间 |
+
+旧库若曾为 `type` 字符串类型，启动时会尝试迁移为 **`SMALLINT`**；若存在无法转为整数的旧数据，需先清理或手工迁移。
+
 ## 运行
 
 ```bash
@@ -71,7 +131,7 @@ module.exports = { handleDemo };
 cp .env.example .env
 
 # 2) 按需修改 .env
-# 例如：MYSQL_*、JWT_SECRET、APPLE_CLIENT_ID
+# 例如：MYSQL_*、JWT_SECRET、APPLE_CLIENT_ID、PUBLIC_BASE_URL
 
 # 3) 安装并启动
 npm install
@@ -103,3 +163,10 @@ npm start
 - `JWT_EXPIRES_IN`（默认 `7d`）
 - `JWT_ISSUER`（默认 `bubu-server`）
 - `JWT_AUDIENCE`（默认 `bubu-client`）
+
+### 皮肤上传与静态访问
+
+- **`PUBLIC_BASE_URL`**：生成 `imageUrl` / `thumbUrl` 时使用的站点根地址，**不要末尾斜杠**。请改成真实域名（例如 `https://api.你的域名.com`），勿保留示例里的 **`your-domain.com`**。若未配置、或仍为占位域名，上传接口会按当前请求的 **`Host`** 与 **`X-Forwarded-Proto`**（常见于 Nginx 反代）拼链接；直连本机且无 `Host` 时回退 `http://127.0.0.1:<PORT>`。
+- **`UPLOAD_ROOT`**：磁盘保存目录，相对进程当前工作目录，默认 `uploads`。对应 HTTP 路径前缀为 **`/uploads`**。
+
+本地仓库中 **`uploads/`** 已加入 `.gitignore`，勿将用户上传文件提交到版本库。

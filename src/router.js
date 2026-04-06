@@ -25,8 +25,6 @@ function loadRouteHandlers() {
 const routeHandlers = loadRouteHandlers();
 
 async function handleRequest(req, res) {
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-
   for (const handler of routeHandlers) {
     // Route handlers return true when they handled the request.
     if (await handler(req, res)) return;

@@ -9,8 +9,7 @@ const server = http.createServer((req, res) => {
   handleRequest(req, res).catch((err) => {
     // eslint-disable-next-line no-console
     console.error("Unhandled request error:", err && err.message ? err.message : err);
-    res.statusCode = 500;
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ error: "Internal Server Error" }));
   });
 });
