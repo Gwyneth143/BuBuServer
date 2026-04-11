@@ -53,7 +53,12 @@ module.exports = { handleDemo };
 - `GET /categories`：获取当前用户类别列表（需 JWT）
 - `POST /categories`：创建类别（需 JWT）
 - `GET /skins`：皮肤列表（可选查询参数，见下文）
+- `GET /skins/system`：系统皮肤列表（仅系统预置皮肤，支持分页）
 - `POST /skins`：上传皮肤（multipart，需 JWT）
+- `POST /skins/delete`：删除皮肤（需 JWT，请求体 `skinId`；仅创建者可删；会同步清理图库关联与本地文件）
+- `POST /my/skins`：用户选择一款皮肤加入自己的图库（需 JWT）
+- `GET /my/skins`：获取我的图库列表（需 JWT，支持分页）
+- `POST /my/skins/delete`：从图库移除一条收藏（需 JWT，请求体 `userSkinId` 为 `user_skins.id`）
 - `GET /uploads/...`：读取本地上传文件（原图、缩略图等；路径需落在 `UPLOAD_ROOT` 内）
 
 ### `GET /categories`
@@ -86,6 +91,47 @@ module.exports = { handleDemo };
   - `totalPages`：总页数（无数据时为 **0**）。
 - **常见错误**：`400` 查询参数 `type`、`creatorUserId`、`page`、`pageSize` / `limit` 格式非法
 
+### `GET /skins/system`
+
+- **鉴权**：无。
+- **行为**：返回系统皮肤列表。当前约定系统皮肤为 `skins.creator_user_id IS NULL` 的记录。
+- **查询参数**：
+  - `type`：可选，`SMALLINT` 整数筛选。
+  - `page`：页码，默认 `1`。
+  - `pageSize` / `limit`：每页条数，`1~100`，默认 `20`。
+- **成功响应**：与 `GET /skins` 一致（`skins`、`total`、`page`、`pageSize`、`totalPages`）。
+
+### `POST /my/skins`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求体**：`application/json`，字段 `skinId`（正整数）。
+- **行为**：将指定皮肤加入当前登录用户的图库（写入 `user_skins` 表）；同一用户重复添加同一皮肤会被拒绝。
+- **成功响应**：
+  - `userSkin`：用户图库关联记录（`id`、`userId`、`skinId`、`createdAt`）
+  - `skin`：被添加的皮肤详情
+- **常见错误**：`401` 未登录；`400` `skinId` 非法；`404` 皮肤不存在；`409` 已添加过
+
+### `GET /my/skins`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **行为**：返回当前用户已加入图库的皮肤列表（基于 `user_skins` 关联 `skins`）。
+- **查询参数**（可选）：
+  - `type`：`SMALLINT` 整数筛选（-32768 ~ 32767）
+  - `page`：页码，默认 `1`
+  - `pageSize` / `limit`：每页条数，`1~100`，默认 `20`
+- **成功响应**：
+  - `skins`：当前页数据，每项包含皮肤字段与 `userSkinId`、`addedAt`
+  - `total`、`page`、`pageSize`、`totalPages`
+- **常见错误**：`401` 未登录；`400` 参数非法
+
+### `POST /my/skins/delete`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求体**：`application/json`，字段 **`userSkinId`**（正整数），为 **`user_skins` 表主键 `id`**（与 `GET /my/skins` 返回项中的 `userSkinId` 一致），不是 `skins.id`。
+- **行为**：删除当前用户图库中对应记录（`DELETE ... WHERE id = ? AND user_id = ?`）。
+- **成功响应**：`{ "ok": true, "userSkinId": <number> }`
+- **常见错误**：`401`；`400` `userSkinId` 非法；`404` 无此记录或不属于当前用户
+
 ### `POST /skins`
 
 - **鉴权**：`Authorization: Bearer <JWT>`。
@@ -105,6 +151,17 @@ module.exports = { handleDemo };
 - **成功响应**：`{ "skin": { 同上字段 } }`
 - **常见错误**：`401`；`400` 缺图、MIME 不支持、`type`（若提供）或 `price`（若提供）非法；`413` 文件过大
 
+### `POST /skins/delete`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求体**：`application/json`，字段 **`skinId`**（正整数），即 **`skins.id`**。
+- **行为**：
+  - 仅当 **`skins.creator_user_id`** 等于当前用户（JWT `sub`）时可删；**系统皮肤**（`creator_user_id IS NULL`）不能通过本接口删除，返回 **403**。
+  - 先删除 **`user_skins`** 中引用该皮肤的记录，再删除 **`skins`** 行。
+  - 根据 `imageUrl` / `thumbUrl` 解析 **`/uploads/...`** 路径并尝试删除磁盘文件（缺失则忽略）。
+- **成功响应**：`{ "ok": true, "skinId": <number> }`
+- **常见错误**：`401`；`400` `skinId` 非法；`403` 无权限；`404` 皮肤不存在
+
 ### `GET /uploads/...`
 
 - 从 **`UPLOAD_ROOT`**（默认项目下 `uploads`）映射子路径，仅允许落在该目录内的文件；用于访问上传的原图与缩略图链接。
@@ -121,6 +178,17 @@ module.exports = { handleDemo };
 | `image_url` / `thumb_url` | 原图与缩略图完整 URL |
 | `creator_user_id` | 可选，创建者 `users.id` |
 | `created_at` | 创建时间 |
+
+### 表 `user_skins` 概要
+
+| 列 | 说明 |
+|----|------|
+| `id` | 自增主键 |
+| `user_id` | 用户 ID（`users.id`） |
+| `skin_id` | 皮肤 ID（`skins.id`） |
+| `created_at` | 加入图库时间 |
+
+约束：`(user_id, skin_id)` 唯一，避免重复收藏同一皮肤。
 
 旧库若曾为 `type` 字符串类型，启动时会尝试迁移为 **`SMALLINT`**；若存在无法转为整数的旧数据，需先清理或手工迁移。
 

@@ -4,6 +4,7 @@ let mysqlPool = null;
 let usersTableReady = false;
 let categoriesTableReady = false;
 let skinsTableReady = false;
+let userSkinsTableReady = false;
 
 function getMysqlPool() {
   if (mysqlPool) return mysqlPool;
@@ -178,6 +179,10 @@ function resetSkinsTableCache() {
   skinsTableReady = false;
 }
 
+function resetUserSkinsTableCache() {
+  userSkinsTableReady = false;
+}
+
 async function migrateSkinsTableIfNeeded(pool) {
   const table = "skins";
   if (!(await columnExists(pool, table, "creator_user_id"))) {
@@ -234,6 +239,25 @@ async function ensureSkinsTable() {
   await migrateSkinsTableIfNeeded(pool);
 
   skinsTableReady = true;
+}
+
+async function ensureUserSkinsTable() {
+  if (userSkinsTableReady) return;
+
+  const pool = getMysqlPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_skins (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT UNSIGNED NOT NULL,
+      skin_id BIGINT UNSIGNED NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_user_skin (user_id, skin_id),
+      KEY idx_user_created (user_id, created_at),
+      KEY idx_skin (skin_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  userSkinsTableReady = true;
 }
 
 async function insertSkin({
@@ -314,6 +338,10 @@ async function listSkins(filters) {
       ? filters.type
       : null;
   const creator = filters && filters.creatorUserIdFilter;
+  const viewerUserId =
+    filters && typeof filters.viewerUserId === "number" && Number.isInteger(filters.viewerUserId)
+      ? filters.viewerUserId
+      : null;
 
   const page =
     filters &&
@@ -333,27 +361,30 @@ async function listSkins(filters) {
 
   const runOnce = async () => {
     await ensureSkinsTable();
+    if (viewerUserId !== null && viewerUserId > 0) {
+      await ensureUserSkinsTable();
+    }
     const pool = getMysqlPool();
 
     const where = [];
     const params = [];
 
     if (typeFilter !== null) {
-      where.push("type = ?");
+      where.push("s.type = ?");
       params.push(typeFilter);
     }
 
     if (creator && creator.kind === "eq") {
-      where.push("creator_user_id = ?");
+      where.push("s.creator_user_id = ?");
       params.push(creator.value);
     } else if (creator && creator.kind === "null") {
-      where.push("creator_user_id IS NULL");
+      where.push("s.creator_user_id IS NULL");
     }
 
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const [countRows] = await pool.query(
-      `SELECT COUNT(*) AS cnt FROM skins ${whereSql}`,
+      `SELECT COUNT(*) AS cnt FROM skins s ${whereSql}`,
       params
     );
     const total =
@@ -362,24 +393,41 @@ async function listSkins(filters) {
         : 0;
 
     const offset = (page - 1) * pageSize;
+    const collectedSelect =
+      viewerUserId !== null && viewerUserId > 0
+        ? `
+        EXISTS(
+          SELECT 1
+          FROM user_skins us
+          WHERE us.user_id = ? AND us.skin_id = s.id
+          LIMIT 1
+        ) AS isCollected
+      `
+        : "0 AS isCollected";
+
     const dataSql = `
       SELECT
-        id,
-        name,
-        type,
-        price,
-        is_member_exclusive AS isMemberExclusive,
-        image_url AS imageUrl,
-        thumb_url AS thumbUrl,
-        creator_user_id AS creatorUserId,
-        created_at AS createdAt
-      FROM skins
+        s.id,
+        s.name,
+        s.type,
+        s.price,
+        s.is_member_exclusive AS isMemberExclusive,
+        s.image_url AS imageUrl,
+        s.thumb_url AS thumbUrl,
+        s.creator_user_id AS creatorUserId,
+        s.created_at AS createdAt,
+        ${collectedSelect}
+      FROM skins s
       ${whereSql}
-      ORDER BY id DESC
+      ORDER BY s.id DESC
       LIMIT ? OFFSET ?
     `;
 
-    const [rows] = await pool.query(dataSql, [...params, pageSize, offset]);
+    const dataParams =
+      viewerUserId !== null && viewerUserId > 0
+        ? [viewerUserId, ...params, pageSize, offset]
+        : [...params, pageSize, offset];
+    const [rows] = await pool.query(dataSql, dataParams);
     const list = Array.isArray(rows) ? rows : [];
     for (const row of list) {
       if (row && Object.prototype.hasOwnProperty.call(row, "isMemberExclusive")) {
@@ -387,6 +435,9 @@ async function listSkins(filters) {
       }
       if (row && Object.prototype.hasOwnProperty.call(row, "type")) {
         row.type = Number(row.type);
+      }
+      if (row && Object.prototype.hasOwnProperty.call(row, "isCollected")) {
+        row.isCollected = Boolean(Number(row.isCollected));
       }
     }
 
@@ -408,6 +459,176 @@ async function listSkins(filters) {
       (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
     if (noTable) {
       resetSkinsTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
+async function listSystemSkins(filters) {
+  return listSkins({
+    ...(filters || {}),
+    creatorUserIdFilter: { kind: "null" },
+  });
+}
+
+async function addSkinToUserGallery({ userId, skinId }) {
+  const runOnce = async () => {
+    await ensureSkinsTable();
+    await ensureUserSkinsTable();
+    const pool = getMysqlPool();
+
+    const [skinRows] = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        type,
+        price,
+        is_member_exclusive AS isMemberExclusive,
+        image_url AS imageUrl,
+        thumb_url AS thumbUrl,
+        creator_user_id AS creatorUserId,
+        created_at AS createdAt
+      FROM skins
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [skinId]
+    );
+    const skin = Array.isArray(skinRows) ? skinRows[0] : null;
+    if (!skin) return { notFound: true };
+
+    if (Object.prototype.hasOwnProperty.call(skin, "isMemberExclusive")) {
+      skin.isMemberExclusive = Boolean(Number(skin.isMemberExclusive));
+    }
+    if (Object.prototype.hasOwnProperty.call(skin, "type")) {
+      skin.type = Number(skin.type);
+    }
+
+    const [result] = await pool.query(
+      `
+      INSERT INTO user_skins (user_id, skin_id)
+      VALUES (?, ?)
+    `,
+      [userId, skinId]
+    );
+    const insertedId = result && result.insertId ? Number(result.insertId) : 0;
+
+    const [rows] = await pool.query(
+      `
+      SELECT
+        us.id,
+        us.user_id AS userId,
+        us.skin_id AS skinId,
+        us.created_at AS createdAt
+      FROM user_skins us
+      WHERE us.id = ?
+      LIMIT 1
+    `,
+      [insertedId]
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    return { row, skin };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetSkinsTableCache();
+      resetUserSkinsTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
+async function listUserGallerySkins({ userId, type, page, pageSize }) {
+  const typeFilter = typeof type === "number" && Number.isInteger(type) ? type : null;
+  const p = Number.isInteger(page) && page >= 1 ? page : 1;
+  const ps = Number.isInteger(pageSize) && pageSize >= 1 && pageSize <= 100 ? pageSize : 20;
+
+  const runOnce = async () => {
+    await ensureSkinsTable();
+    await ensureUserSkinsTable();
+    const pool = getMysqlPool();
+
+    const where = ["us.user_id = ?"];
+    const params = [userId];
+    if (typeFilter !== null) {
+      where.push("s.type = ?");
+      params.push(typeFilter);
+    }
+    const whereSql = `WHERE ${where.join(" AND ")}`;
+
+    const [countRows] = await pool.query(
+      `
+      SELECT COUNT(*) AS cnt
+      FROM user_skins us
+      INNER JOIN skins s ON s.id = us.skin_id
+      ${whereSql}
+    `,
+      params
+    );
+    const total =
+      Array.isArray(countRows) && countRows[0] && countRows[0].cnt != null
+        ? Number(countRows[0].cnt)
+        : 0;
+
+    const offset = (p - 1) * ps;
+    const [rows] = await pool.query(
+      `
+      SELECT
+        us.id AS userSkinId,
+        us.created_at AS addedAt,
+        s.id,
+        s.name,
+        s.type,
+        s.price,
+        s.is_member_exclusive AS isMemberExclusive,
+        s.image_url AS imageUrl,
+        s.thumb_url AS thumbUrl,
+        s.creator_user_id AS creatorUserId,
+        s.created_at AS createdAt
+      FROM user_skins us
+      INNER JOIN skins s ON s.id = us.skin_id
+      ${whereSql}
+      ORDER BY us.id DESC
+      LIMIT ? OFFSET ?
+    `,
+      [...params, ps, offset]
+    );
+
+    const skins = Array.isArray(rows) ? rows : [];
+    for (const row of skins) {
+      if (row && Object.prototype.hasOwnProperty.call(row, "isMemberExclusive")) {
+        row.isMemberExclusive = Boolean(Number(row.isMemberExclusive));
+      }
+      if (row && Object.prototype.hasOwnProperty.call(row, "type")) {
+        row.type = Number(row.type);
+      }
+    }
+
+    return {
+      skins,
+      total,
+      page: p,
+      pageSize: ps,
+      totalPages: total === 0 ? 0 : Math.ceil(total / ps),
+    };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetSkinsTableCache();
+      resetUserSkinsTableCache();
       return runOnce();
     }
     throw err;
@@ -587,6 +808,97 @@ async function initDatabaseIfConfigured() {
   await ensureUsersTable();
   await ensureCategoriesTable();
   await ensureSkinsTable();
+  await ensureUserSkinsTable();
+}
+
+async function deleteSkinByOwner({ skinId, ownerUserId }) {
+  const runOnce = async () => {
+    await ensureSkinsTable();
+    await ensureUserSkinsTable();
+    const pool = getMysqlPool();
+
+    const [skinRows] = await pool.query(
+      `
+      SELECT
+        id,
+        image_url AS imageUrl,
+        thumb_url AS thumbUrl,
+        creator_user_id AS creatorUserId
+      FROM skins
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [skinId]
+    );
+    const skin = Array.isArray(skinRows) ? skinRows[0] : null;
+    if (!skin) {
+      return { notFound: true };
+    }
+
+    const creatorId =
+      skin.creatorUserId === null || skin.creatorUserId === undefined
+        ? null
+        : Number(skin.creatorUserId);
+    const owner = Number(ownerUserId);
+    if (creatorId === null || !Number.isFinite(owner) || creatorId !== owner) {
+      return { forbidden: true };
+    }
+
+    await pool.query(`DELETE FROM user_skins WHERE skin_id = ?`, [skinId]);
+    const [delResult] = await pool.query(
+      `DELETE FROM skins WHERE id = ? AND creator_user_id = ?`,
+      [skinId, owner]
+    );
+    const affected =
+      delResult && delResult.affectedRows != null ? Number(delResult.affectedRows) : 0;
+    return {
+      removed: affected > 0,
+      imageUrl: skin.imageUrl,
+      thumbUrl: skin.thumbUrl,
+    };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetSkinsTableCache();
+      resetUserSkinsTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
+async function removeUserGallerySkin({ userId, userSkinId }) {
+  const runOnce = async () => {
+    await ensureUserSkinsTable();
+    const pool = getMysqlPool();
+    const [result] = await pool.query(
+      `
+      DELETE FROM user_skins
+      WHERE id = ? AND user_id = ?
+    `,
+      [userSkinId, userId]
+    );
+    const affected =
+      result && result.affectedRows != null ? Number(result.affectedRows) : 0;
+    return { removed: affected > 0 };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetUserSkinsTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
 }
 
 module.exports = {
@@ -594,10 +906,16 @@ module.exports = {
   ensureUsersTable,
   ensureCategoriesTable,
   ensureSkinsTable,
+  ensureUserSkinsTable,
   insertCategory,
   listCategoriesByCreatorUserId,
   insertSkin,
   listSkins,
+  listSystemSkins,
+  addSkinToUserGallery,
+  listUserGallerySkins,
+  removeUserGallerySkin,
+  deleteSkinByOwner,
   upsertAppleUser,
   initDatabaseIfConfigured,
 };

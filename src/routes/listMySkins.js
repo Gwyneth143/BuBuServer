@@ -1,6 +1,6 @@
 const { sendJson, getBearerToken } = require("../utils/http");
 const { verifyAppJwt } = require("../services/jwt");
-const { listSkins } = require("../services/db");
+const { listUserGallerySkins } = require("../services/db");
 
 function getPathname(url) {
   if (!url) return "";
@@ -14,11 +14,29 @@ function parseQuery(url) {
   return new URLSearchParams(qs);
 }
 
-async function handleListSkins(req, res) {
-  if (req.method !== "GET") return false;
+async function handleListMySkins(req, res) {
+  if (!(req.method === "GET" && getPathname(req.url) === "/my/skins")) return false;
 
-  const pathname = getPathname(req.url);
-  if (pathname !== "/skins") return false;
+  const token = getBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: "Missing Authorization: Bearer <token>" });
+    return true;
+  }
+
+  let payload;
+  try {
+    payload = verifyAppJwt(token);
+  } catch (err) {
+    const detail = err && err.message ? err.message : String(err);
+    sendJson(res, 401, { error: "Invalid or expired token", detail });
+    return true;
+  }
+
+  const userId = Number(payload.sub);
+  if (!Number.isFinite(userId) || userId <= 0) {
+    sendJson(res, 401, { error: "Invalid token subject" });
+    return true;
+  }
 
   const sp = parseQuery(req.url || "");
 
@@ -28,38 +46,13 @@ async function handleListSkins(req, res) {
     type = undefined;
   } else {
     const typeNum = Number.parseInt(String(typeRaw).trim(), 10);
-    if (
-      !Number.isInteger(typeNum) ||
-      typeNum < -32768 ||
-      typeNum > 32767
-    ) {
+    if (!Number.isInteger(typeNum) || typeNum < -32768 || typeNum > 32767) {
       sendJson(res, 400, {
         error: "Invalid query: type must be a SMALLINT integer (-32768 .. 32767)",
       });
       return true;
     }
     type = typeNum;
-  }
-
-  let creatorUserIdFilter;
-  if (!sp.has("creatorUserId")) {
-    creatorUserIdFilter = undefined;
-  } else {
-    const raw = sp.get("creatorUserId");
-    const s = raw === null ? "" : String(raw).trim();
-    if (s === "" || s.toLowerCase() === "null") {
-      creatorUserIdFilter = { kind: "null" };
-    } else {
-      const n = Number(s);
-      if (!Number.isFinite(n) || n <= 0 || !Number.isInteger(n)) {
-        sendJson(res, 400, {
-          error:
-            "Invalid query: creatorUserId must be a positive integer, or empty / the literal null for unassigned skins",
-        });
-        return true;
-      }
-      creatorUserIdFilter = { kind: "eq", value: n };
-    }
   }
 
   const pageRaw = sp.get("page");
@@ -93,26 +86,8 @@ async function handleListSkins(req, res) {
     pageSize = ps;
   }
 
-  let viewerUserId;
-  const token = getBearerToken(req);
-  if (token) {
-    try {
-      const payload = verifyAppJwt(token);
-      const uid = Number(payload.sub);
-      if (!Number.isFinite(uid) || uid <= 0) {
-        sendJson(res, 401, { error: "Invalid token subject" });
-        return true;
-      }
-      viewerUserId = uid;
-    } catch (err) {
-      const detail = err && err.message ? err.message : String(err);
-      sendJson(res, 401, { error: "Invalid or expired token", detail });
-      return true;
-    }
-  }
-
   try {
-    const result = await listSkins({ type, creatorUserIdFilter, page, pageSize, viewerUserId });
+    const result = await listUserGallerySkins({ userId, type, page, pageSize });
     sendJson(res, 200, {
       skins: result.skins,
       total: result.total,
@@ -122,7 +97,7 @@ async function handleListSkins(req, res) {
     });
   } catch (err) {
     sendJson(res, 500, {
-      error: "Failed to list skins",
+      error: "Failed to list my skins",
       detail: err && err.message ? err.message : String(err),
     });
   }
@@ -131,5 +106,5 @@ async function handleListSkins(req, res) {
 }
 
 module.exports = {
-  handleListSkins,
+  handleListMySkins,
 };
