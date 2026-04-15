@@ -5,6 +5,7 @@ let usersTableReady = false;
 let categoriesTableReady = false;
 let skinsTableReady = false;
 let userSkinsTableReady = false;
+let booksTableReady = false;
 
 function getMysqlPool() {
   if (mysqlPool) return mysqlPool;
@@ -183,6 +184,10 @@ function resetUserSkinsTableCache() {
   userSkinsTableReady = false;
 }
 
+function resetBooksTableCache() {
+  booksTableReady = false;
+}
+
 async function migrateSkinsTableIfNeeded(pool) {
   const table = "skins";
   if (!(await columnExists(pool, table, "creator_user_id"))) {
@@ -258,6 +263,419 @@ async function ensureUserSkinsTable() {
   `);
 
   userSkinsTableReady = true;
+}
+
+async function migrateBooksTableIfNeeded(pool) {
+  const table = "books";
+  if (!(await columnExists(pool, table, "cover_thumb_url"))) {
+    await pool.query(
+      `ALTER TABLE \`${table}\` ADD COLUMN cover_thumb_url VARCHAR(2048) NULL AFTER cover_url`
+    );
+  }
+  if (!(await columnExists(pool, table, "skin_id"))) {
+    await pool.query(
+      `ALTER TABLE \`${table}\` ADD COLUMN skin_id BIGINT UNSIGNED NULL AFTER category_name`
+    );
+  }
+  if (!(await indexExists(pool, table, "idx_books_skin"))) {
+    try {
+      await pool.query(`ALTER TABLE \`${table}\` ADD KEY idx_books_skin (skin_id)`);
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error("Could not add idx_books_skin:", msg);
+    }
+  }
+}
+
+async function ensureBooksTable() {
+  if (booksTableReady) return;
+
+  const pool = getMysqlPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS books (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      creator_user_id BIGINT UNSIGNED NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      category_name VARCHAR(255) NOT NULL,
+      skin_id BIGINT UNSIGNED NOT NULL,
+      cover_url VARCHAR(2048) NOT NULL,
+      cover_thumb_url VARCHAR(2048) NULL,
+      is_delete TINYINT(1) NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      deleted_at DATETIME NULL,
+      KEY idx_creator (creator_user_id),
+      KEY idx_category (category_name),
+      KEY idx_books_skin (skin_id),
+      KEY idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await migrateBooksTableIfNeeded(pool);
+
+  booksTableReady = true;
+}
+
+async function insertBook({ creatorUserId, title, categoryName, skinId }) {
+  const runOnce = async () => {
+    await ensureSkinsTable();
+    await ensureBooksTable();
+    const pool = getMysqlPool();
+
+    const [skinRows] = await pool.query(
+      `
+      SELECT image_url AS imageUrl, thumb_url AS thumbUrl
+      FROM skins
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [skinId]
+    );
+    const skin = Array.isArray(skinRows) ? skinRows[0] : null;
+    if (!skin || !skin.imageUrl) {
+      return { notFound: true };
+    }
+    const coverThumbUrl = skin.thumbUrl || skin.imageUrl || null;
+
+    const [result] = await pool.query(
+      `
+      INSERT INTO books (creator_user_id, title, category_name, skin_id, cover_url, cover_thumb_url, is_delete)
+      VALUES (?, ?, ?, ?, ?, ?, 0)
+    `,
+      [creatorUserId, title, categoryName, skinId, skin.imageUrl, coverThumbUrl]
+    );
+
+    const insertedId = result && result.insertId ? Number(result.insertId) : 0;
+    const [rows] = await pool.query(
+      `
+      SELECT
+        id,
+        creator_user_id AS creatorUserId,
+        title,
+        category_name AS categoryName,
+        skin_id AS skinId,
+        cover_url AS coverUrl,
+        cover_thumb_url AS coverThumbUrl,
+        is_delete AS isDelete,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        deleted_at AS deletedAt
+      FROM books
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [insertedId]
+    );
+
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (row && Object.prototype.hasOwnProperty.call(row, "isDelete")) {
+      row.isDelete = Boolean(Number(row.isDelete));
+    }
+    if (row && row.skinId != null) {
+      row.skinId = Number(row.skinId);
+    }
+    return { book: row };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetSkinsTableCache();
+      resetBooksTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
+async function softDeleteBookByOwner({ userId, bookId }) {
+  const runOnce = async () => {
+    await ensureBooksTable();
+    const pool = getMysqlPool();
+
+    const [bookRows] = await pool.query(
+      `
+      SELECT
+        id,
+        creator_user_id AS creatorUserId,
+        is_delete AS isDelete
+      FROM books
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [bookId]
+    );
+    const book = Array.isArray(bookRows) ? bookRows[0] : null;
+    if (!book) {
+      return { notFound: true };
+    }
+    const creator = Number(book.creatorUserId);
+    const uid = Number(userId);
+    if (!Number.isFinite(creator) || creator !== uid) {
+      return { forbidden: true };
+    }
+    if (Boolean(Number(book.isDelete))) {
+      return { alreadyDeleted: true };
+    }
+
+    await pool.query(
+      `
+      UPDATE books
+      SET is_delete = 1, deleted_at = NOW()
+      WHERE id = ? AND creator_user_id = ? AND is_delete = 0
+    `,
+      [bookId, uid]
+    );
+
+    const [rows] = await pool.query(
+      `
+      SELECT
+        id,
+        creator_user_id AS creatorUserId,
+        title,
+        category_name AS categoryName,
+        skin_id AS skinId,
+        cover_url AS coverUrl,
+        cover_thumb_url AS coverThumbUrl,
+        is_delete AS isDelete,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        deleted_at AS deletedAt
+      FROM books
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [bookId]
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (row && Object.prototype.hasOwnProperty.call(row, "isDelete")) {
+      row.isDelete = Boolean(Number(row.isDelete));
+    }
+    if (row && row.skinId != null) {
+      row.skinId = Number(row.skinId);
+    }
+    return { ok: true, book: row };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetBooksTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
+async function touchBookUpdatedAtByOwner({ userId, bookId }) {
+  const runOnce = async () => {
+    await ensureBooksTable();
+    const pool = getMysqlPool();
+
+    const [bookRows] = await pool.query(
+      `
+      SELECT
+        id,
+        creator_user_id AS creatorUserId,
+        is_delete AS isDelete
+      FROM books
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [bookId]
+    );
+    const book = Array.isArray(bookRows) ? bookRows[0] : null;
+    if (!book) {
+      return { notFound: true };
+    }
+    const creator = Number(book.creatorUserId);
+    const uid = Number(userId);
+    if (!Number.isFinite(creator) || creator !== uid) {
+      return { forbidden: true };
+    }
+    if (Boolean(Number(book.isDelete))) {
+      return { alreadyDeleted: true };
+    }
+
+    await pool.query(
+      `
+      UPDATE books
+      SET updated_at = NOW()
+      WHERE id = ? AND creator_user_id = ? AND is_delete = 0
+    `,
+      [bookId, uid]
+    );
+
+    const [rows] = await pool.query(
+      `
+      SELECT
+        id,
+        creator_user_id AS creatorUserId,
+        title,
+        category_name AS categoryName,
+        skin_id AS skinId,
+        cover_url AS coverUrl,
+        cover_thumb_url AS coverThumbUrl,
+        is_delete AS isDelete,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        deleted_at AS deletedAt
+      FROM books
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [bookId]
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (row && Object.prototype.hasOwnProperty.call(row, "isDelete")) {
+      row.isDelete = Boolean(Number(row.isDelete));
+    }
+    if (row && row.skinId != null) {
+      row.skinId = Number(row.skinId);
+    }
+    return { ok: true, book: row };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetBooksTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
+async function listBooks(filters) {
+  const page =
+    filters &&
+    typeof filters.page === "number" &&
+    Number.isInteger(filters.page) &&
+    filters.page >= 1
+      ? filters.page
+      : 1;
+  const pageSize =
+    filters &&
+    typeof filters.pageSize === "number" &&
+    Number.isInteger(filters.pageSize) &&
+    filters.pageSize >= 1 &&
+    filters.pageSize <= 100
+      ? filters.pageSize
+      : 20;
+
+  const creatorFilter =
+    filters &&
+    typeof filters.creatorUserId === "number" &&
+    Number.isInteger(filters.creatorUserId) &&
+    filters.creatorUserId >= 1
+      ? filters.creatorUserId
+      : null;
+
+  if (creatorFilter === null) {
+    return {
+      books: [],
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 0,
+    };
+  }
+
+  const categoryTrim =
+    filters &&
+    filters.categoryName != null &&
+    String(filters.categoryName).trim() !== ""
+      ? String(filters.categoryName).trim()
+      : null;
+
+  const runOnce = async () => {
+    await ensureBooksTable();
+    const pool = getMysqlPool();
+
+    const where = ["b.is_delete = 0", "b.creator_user_id = ?"];
+    const params = [creatorFilter];
+
+    if (categoryTrim !== null) {
+      where.push("b.category_name = ?");
+      params.push(categoryTrim);
+    }
+
+    const whereSql = `WHERE ${where.join(" AND ")}`;
+
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM books b ${whereSql}`,
+      params
+    );
+    const total =
+      Array.isArray(countRows) && countRows[0] && countRows[0].cnt != null
+        ? Number(countRows[0].cnt)
+        : 0;
+
+    const offset = (page - 1) * pageSize;
+    const [rows] = await pool.query(
+      `
+      SELECT
+        b.id,
+        b.creator_user_id AS creatorUserId,
+        b.title,
+        b.category_name AS categoryName,
+        b.skin_id AS skinId,
+        b.cover_url AS coverUrl,
+        b.cover_thumb_url AS coverThumbUrl,
+        b.is_delete AS isDelete,
+        b.created_at AS createdAt,
+        b.updated_at AS updatedAt,
+        b.deleted_at AS deletedAt
+      FROM books b
+      ${whereSql}
+      ORDER BY b.updated_at DESC, b.id DESC
+      LIMIT ? OFFSET ?
+    `,
+      [...params, pageSize, offset]
+    );
+
+    const list = Array.isArray(rows) ? rows : [];
+    for (const row of list) {
+      if (row && Object.prototype.hasOwnProperty.call(row, "isDelete")) {
+        row.isDelete = Boolean(Number(row.isDelete));
+      }
+      if (row && row.skinId != null) {
+        row.skinId = Number(row.skinId);
+      }
+    }
+
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+    return {
+      books: list,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetBooksTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
 }
 
 async function insertSkin({
@@ -809,6 +1227,7 @@ async function initDatabaseIfConfigured() {
   await ensureCategoriesTable();
   await ensureSkinsTable();
   await ensureUserSkinsTable();
+  await ensureBooksTable();
 }
 
 async function deleteSkinByOwner({ skinId, ownerUserId }) {
@@ -907,7 +1326,12 @@ module.exports = {
   ensureCategoriesTable,
   ensureSkinsTable,
   ensureUserSkinsTable,
+  ensureBooksTable,
   insertCategory,
+  insertBook,
+  softDeleteBookByOwner,
+  touchBookUpdatedAtByOwner,
+  listBooks,
   listCategoriesByCreatorUserId,
   insertSkin,
   listSkins,

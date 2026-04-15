@@ -3,7 +3,7 @@
 一个基于 Node.js 原生 `http` 的轻量后端示例，支持：
 
 - Apple ID 登录并签发业务 JWT
-- MySQL 连通性与表自动建表（`users`、`categories`、`skins`）
+- MySQL 连通性与表自动建表（`users`、`categories`、`skins`、`books`）
 - 皮肤图片上传（原图 + 缩略图）、`skins` 表入库与列表查询
 - 本地上传目录的静态访问（`GET /uploads/...`）
 
@@ -52,6 +52,10 @@ module.exports = { handleDemo };
 - `POST /auth/apple`：苹果登录校验 + 用户入库/更新 + 返回 JWT
 - `GET /categories`：获取当前用户类别列表（需 JWT）
 - `POST /categories`：创建类别（需 JWT）
+- `GET /books`：当前用户的册子列表（需 JWT，支持分页；可选按分类筛选）
+- `POST /books`：上传册子（需 JWT，请求体 `title`、`category_name`、`skinId`）
+- `POST /books/delete`：删除册子（需 JWT，请求体 `bookId`；软删除，仅创建者）
+- `POST /books/update`：刷新册子更新时间（需 JWT，请求体 `bookId`；仅创建者）
 - `GET /skins`：皮肤列表（可选查询参数，见下文）
 - `GET /skins/system`：系统皮肤列表（仅系统预置皮肤，支持分页）
 - `POST /skins`：上传皮肤（multipart，需 JWT）
@@ -74,6 +78,60 @@ module.exports = { handleDemo };
 - **行为**：在表 **`categories`** 中插入 `name` 与 `creator_user_id`（来自 JWT 的 `sub`，即当前用户 `users.id`）。同一用户对同一类别名不可重复（唯一约束 `(creator_user_id, name)`）。
 - **成功响应**：`{ "category": { "id", "name", "creatorUserId", "createdAt", "updatedAt" } }`
 - **常见错误**：`401` 未带或无效 token；`400` 缺少 `name`；`409` 该用户已存在同名类别。
+
+### `GET /books`
+
+- **鉴权**：请求头 `Authorization: Bearer <JWT>`。仅返回 **JWT `sub` 对应用户**创建的、且 **`is_delete = 0`** 的册子（忽略查询参数中的创建者 ID，不可查看他人册子）。
+- **排序**：按 **`updated_at` 降序**（接口 JSON 字段 **`updatedAt`** 最新更新的在前）；`updated_at` 相同时按 **`id` 降序**。
+- **查询参数**（均可选）：
+  - **`page`**：页码，正整数，默认 **`1`**。
+  - **`pageSize`** 或 **`limit`**：每页条数，正整数，默认 **`20`**，最大 **`100`**。
+  - **`categoryName`** 或 **`category_name`**：字符串，按 **`category_name`** 精确匹配（仍限定为当前用户）。
+- **成功响应**：`{ "books": [ { "id", "creatorUserId", "title", "categoryName", "skinId", "coverUrl", "coverThumbUrl", "isDelete", "createdAt", "updatedAt", "deletedAt" }, ... ], "total", "page", "pageSize", "totalPages" }`
+- **常见错误**：`401` 未带或无效 token
+
+### `POST /books`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求体**：`application/json`：
+  - **`title`**（字符串，必填）
+  - **`category_name`**（字符串，必填；也接受 **`categoryName`**）
+  - **`skinId`**（正整数，必填）：引用 **`skins.id`**；**`cover_url`** 取该皮肤的 **`image_url`**（原图）；**`cover_thumb_url`** 取该皮肤的 **`thumb_url`**（无则回退为原图）。
+- **行为**：在表 **`books`** 中写入一条册子，**同时保存 `skin_id` 与封面 URL 快照**；`creator_user_id` 为 JWT `sub`；新建时 **`is_delete` 为 0**，**`deleted_at` 为 `NULL`**。
+- **成功响应**：`{ "book": { "id", "creatorUserId", "title", "categoryName", "skinId", "coverUrl", "coverThumbUrl", "isDelete", "createdAt", "updatedAt", "deletedAt" } }`（**`skinId`** 为引用 **`skins.id`**，与冗余存储的封面 URL 一致）
+- **常见错误**：`401`；`400` 字段非法；`404` 皮肤不存在
+
+### `POST /books/delete`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求体**：`application/json`，字段 **`bookId`**（正整数），即 **`books.id`**。
+- **行为**：**软删除**——将 **`is_delete` 置为 `1`**，并写入 **`deleted_at`**；仅 **`creator_user_id`** 为当前用户时可操作。
+- **成功响应**：`{ "ok": true, "book": { ... } }`（`book` 为更新后的记录，`isDelete` 为 `true`）
+- **常见错误**：`401`；`400` `bookId` 非法；`403` 非创建者；`404` 册子不存在；`409` 已删除过
+
+### `POST /books/update`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求体**：`application/json`，字段 **`bookId`**（正整数），即 **`books.id`**。
+- **行为**：将对应册子的 **`updated_at`** 更新为当前时间（`NOW()`）；仅 **`creator_user_id`** 为当前用户时可操作；已删除册子不允许刷新。
+- **成功响应**：`{ "ok": true, "book": { ... } }`（`book.updatedAt` 为最新时间）
+- **常见错误**：`401`；`400` `bookId` 非法；`403` 非创建者；`404` 册子不存在；`409` 册子已删除
+
+### 表 `books` 概要
+
+| 列 | 说明 |
+|----|------|
+| `id` | 自增主键 |
+| `creator_user_id` | 创建者 `users.id` |
+| `title` | 标题 |
+| `category_name` | 分类名称 |
+| `skin_id` | 引用 **`skins.id`**（接口 JSON 为 **`skinId`**）；可与 `cover_*` 冗余并存，便于按皮肤反查或刷新链接 |
+| `cover_url` | 封面原图 URL（来自对应皮肤的 `image_url`） |
+| `cover_thumb_url` | 封面缩略图 URL（来自对应皮肤的 `thumb_url`；接口 JSON 字段名为 **`coverThumbUrl`**） |
+| `is_delete` | 是否删除（`0`/`1`） |
+| `created_at` | 创建时间（对应需求中的 create_at） |
+| `updated_at` | 更新时间（对应 update_at） |
+| `deleted_at` | 删除时间，未删为 `NULL`（对应 delete_at） |
 
 ### `GET /skins`
 
