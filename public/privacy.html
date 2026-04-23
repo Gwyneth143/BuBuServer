@@ -166,6 +166,21 @@
       line-height: 1.8;
     }
 
+    /* 图片数据专用提示框，稍重一些 */
+    .callout-img {
+      background: #FFF7ED;
+      border: 1px solid #F5D8B0;
+      border-left: 3px solid #D97706;
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin: 12px 0 4px;
+      font-size: 14px;
+      color: #7C4D0F;
+      line-height: 1.85;
+    }
+    
+    .callout-img strong { color: #92400E; }
+
     /* ── Rights grid ── */
     .rights-grid {
       display: grid;
@@ -295,6 +310,10 @@
       <div class="item">
         <div class="item-label">1.2 你主动提供或生成的内容</div>
         <p>你在本软件中创建、编辑、上传、保存的内容，例如笔记文本、图片、扫描件、册子与封面相关信息等。</p>
+        <div class="callout-img">
+          <strong>关于图片数据的存储说明：</strong><br />
+          你在本软件中上传、扫描的文件或图片数据，<strong>仅存储在你的本地设备</strong>或你主动启用的 iCloud 中，<strong>不会上传至我们的服务器</strong>。请妥善保管原始数据，避免因设备丢失、损坏、系统重置或删除 App 导致数据不可恢复。
+        </div>
       </div>
 
       <div class="item">
