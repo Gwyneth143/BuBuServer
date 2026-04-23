@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>用户须知（服务条款）</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F6F4EF;
+      --surface: #FFFFFF;
+      --border: #E4DFD7;
+      --text-primary: #1C1A17;
+      --text-secondary: #5C574F;
+      --text-muted: #9C9790;
+      --accent: #2B4C8C;
+      --accent-light: #EDF1F9;
+      --accent-border: #C3D0E8;
+      --radius: 6px;
+      --radius-lg: 12px;
+    }
+
+    body {
+      font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.85;
+      min-height: 100vh;
+      padding: 52px 16px 88px;
+    }
+
+    .page-wrapper {
+      max-width: 740px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 44px;
+    }
+
+    .header-eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .header h1 {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .header-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .header-divider {
+      width: 44px;
+      height: 2px;
+      background: var(--accent);
+      margin: 18px auto 0;
+      border-radius: 2px;
+    }
+
+    .intro-box {
+      background: var(--accent-light);
+      border: 1px solid var(--accent-border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      font-size: 14px;
+      color: var(--accent);
+      line-height: 1.85;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px 22px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+      transition: background 0.15s;
+    }
+
+    .card-header:hover { background: #FAFAF7; }
+
+    .card.open .card-header { border-bottom-color: var(--border); }
+
+    .card-num {
+      width: 26px;
+      height: 26px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+      flex: 1;
+    }
+
+    .card-arrow {
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform 0.22s;
+    }
+
+    .card.open .card-arrow { transform: rotate(90deg); }
+
+    .card-body {
+      display: none;
+      padding: 20px 22px 22px;
+    }
+
+    .card.open .card-body { display: block; }
+
+    .item { margin-bottom: 16px; }
+    .item:last-child { margin-bottom: 0; }
+
+    .item-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 5px;
+    }
+
+    .item p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.85;
+    }
+
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .contact-icon {
+      width: 42px;
+      height: 42px;
+      background: var(--accent-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .contact-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+
+    .contact-info a {
+      font-size: 15px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .contact-info a:hover { text-decoration: underline; }
+
+    .footer {
+      text-align: center;
+      margin-top: 32px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 2;
+    }
+
+    @media (max-width: 480px) {
+      .header h1 { font-size: 22px; }
+      .card-header { padding: 13px 16px; }
+      .card-body { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <div class="header">
+    <p class="header-eyebrow">请在使用前仔细阅读</p>
+    <h1>《用户须知》（服务条款）</h1>
+    <p class="header-sub">生效日期：[2026 年 04 月 21 日]</p>
+    <div class="header-divider"></div>
+  </div>
+
+  <div class="intro-box">
+    欢迎使用「Folio」（以下简称"本软件"或"我们"）。在使用本软件及相关服务前，请你仔细阅读并充分理解本《用户须知》（以下简称"本须知"）。当你注册、登录、使用或以其他方式使用本软件，即表示你已阅读并同意受本须知约束。如你不同意，请停止使用本软件。
+  </div>
+
+  <!-- 1 -->
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">1</div>
+      <span class="card-title">服务说明</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">1.1 服务内容</div>
+        <p>本软件为用户提供笔记/册子管理、内容采集（含相册与文件导入等）、文档扫描与整理、封面与素材相关功能、数据同步（如你启用 iCloud 等）等服务。具体功能以本软件实际提供为准。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">1.2 服务调整</div>
+        <p>我们可能因升级、维护、合规要求、技术条件等原因对服务进行调整、更新、暂停或终止，并将尽可能以合理方式进行提示（如适用）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">2</div>
+      <span class="card-title">账号与登录</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">2.1 账号注册</div>
+        <p>你可能需要通过第三方账号体系（例如 Apple 登录）完成登录。你应保证提交信息真实、准确，并妥善保管账号安全。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">2.2 账号安全</div>
+        <p>你对账号下的操作行为负责。如发现账号异常，请及时采取安全措施并联系我们（如适用）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">3</div>
+      <span class="card-title">用户内容与行为规范</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">3.1 内容权利</div>
+        <p>你在本软件中上传、创建、存储的内容（包括但不限于文字、图片、扫描件等）由你依法享有相应权利，并应对其合法性负责。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">3.2 禁止行为</div>
+        <p>你不得利用本软件从事任何违法、侵权、骚扰、传播恶意程序、绕过安全机制、未经授权访问系统或他人数据等行为。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">3.3 违规处理</div>
+        <p>我们有权在法律法规允许范围内，对明显违法或侵权内容采取必要措施（如限制功能、删除内容、终止服务等）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">4</div>
+      <span class="card-title">知识产权</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">4.1 权利归属</div>
+        <p>本软件的界面设计、标识、代码及其他相关内容的知识产权归我们或权利人所有。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">4.2 使用限制</div>
+        <p>未经我们书面许可，你不得复制、修改、传播、反向工程本软件或其核心组件（法律另有规定的除外）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">5</div>
+      <span class="card-title">第三方服务</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">5.1 集成说明</div>
+        <p>本软件可能集成或依赖第三方服务（例如 Apple 账号体系、系统相册/相机、文档扫描能力、网络图片加载、云同步能力等）。该等第三方服务受其自身条款与隐私政策约束。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">5.2 责任边界</div>
+        <p>因第三方服务原因导致的问题，我们将协助你在合理范围内排查，但不承担第三方服务本身的义务与责任。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">5.3 SDK 说明</div>
+        <p>除本软件独立后端服务及系统能力（如 Apple 登录、系统相册/相机、文档扫描、iCloud 等）外，当前版本未接入第三方统计/广告 SDK；如后续接入，我们将在隐私政策中更新说明。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">6</div>
+      <span class="card-title">免责声明与责任限制</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">6.1 责任限制</div>
+        <p>本软件按"现状"和"可用性"提供。在适用法律允许的最大范围内，我们对因不可抗力、网络环境、设备兼容性、第三方原因等造成的服务中断、数据丢失、延迟等不承担责任或仅承担法律规定的有限责任。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">6.2 数据备份</div>
+        <p>你理解并同意：重要内容请你自行备份；我们不保证服务绝对连续、无错误或无风险。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">7</div>
+      <span class="card-title">协议变更</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>我们可能更新本须知。更新后，如你继续使用本软件，即视为接受更新后的须知；如你不同意，请停止使用。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">8</div>
+      <span class="card-title">适用法律与争议解决</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">8.1 适用法律</div>
+        <p>本须知适用中华人民共和国大陆地区法律（如另有强制性规定，从其规定）。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">8.2 争议解决</div>
+        <p>因本须知引起的争议，双方应尽量友好协商；协商不成的，提交至开发者住所地有管辖权的人民法院诉讼解决诉讼解决。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. 联系我们 -->
+  <div class="contact-box">
+    <div class="contact-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2B4C8C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <path d="M2 7l10 7 10-7"/>
+      </svg>
+    </div>
+    <div class="contact-info">
+      <p>第 9 条 · 联系我们</p>
+      <a href="mailto:2858401629@qq.com">2858401629@qq.com</a>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>如对本须知有任何疑问，欢迎通过上述邮箱与我们联系</p>
+  </div>
+
+</div>
+<script>
+  function toggle(header) {
+    header.closest('.card').classList.toggle('open');
+  }
+</script>
+</body>
+</html>

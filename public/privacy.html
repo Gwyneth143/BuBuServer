@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>隐私政策 · Folio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F6F4EF;
+      --surface: #FFFFFF;
+      --border: #E4DFD7;
+      --text-primary: #1C1A17;
+      --text-secondary: #5C574F;
+      --text-muted: #9C9790;
+      --accent: #2B4C8C;
+      --accent-light: #EDF1F9;
+      --accent-border: #C3D0E8;
+      --green: #1A5C3A;
+      --green-light: #EAF3EE;
+      --green-border: #A8D4BC;
+      --radius-lg: 12px;
+      --radius: 6px;
+    }
+
+    body {
+      font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.85;
+      min-height: 100vh;
+      padding: 52px 16px 88px;
+    }
+
+    .page-wrapper { max-width: 740px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header { text-align: center; margin-bottom: 44px; }
+
+    .header-eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .header h1 {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .header-sub { font-size: 13px; color: var(--text-muted); }
+
+    .header-divider {
+      width: 44px; height: 2px;
+      background: var(--accent);
+      margin: 18px auto 0;
+      border-radius: 2px;
+    }
+
+    /* ── Intro ── */
+    .intro-box {
+      background: var(--accent-light);
+      border: 1px solid var(--accent-border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      font-size: 14px;
+      color: var(--accent);
+      line-height: 1.85;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px 22px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+      transition: background 0.15s;
+    }
+
+    .card-header:hover { background: #FAFAF7; }
+    .card.open .card-header { border-bottom-color: var(--border); }
+
+    .card-num {
+      width: 26px; height: 26px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .card-title { font-size: 15px; font-weight: 500; color: var(--text-primary); flex: 1; }
+
+    .card-arrow { font-size: 11px; color: var(--text-muted); transition: transform 0.22s; }
+    .card.open .card-arrow { transform: rotate(90deg); }
+
+    .card-body { display: none; padding: 20px 22px 22px; }
+    .card.open .card-body { display: block; }
+
+    /* ── Item ── */
+    .item { margin-bottom: 18px; }
+    .item:last-child { margin-bottom: 0; }
+
+    .item-label {
+      font-size: 12px; font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .item p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.85;
+      margin-bottom: 6px;
+    }
+
+    .item p:last-child { margin-bottom: 0; }
+
+    /* ── Bullet list ── */
+    .bul {
+      padding-left: 18px;
+      margin: 6px 0 8px;
+    }
+
+    .bul li {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.85;
+      margin-bottom: 5px;
+      list-style: disc;
+    }
+
+    .bul li:last-child { margin-bottom: 0; }
+
+    /* ── Callout (注意/说明) ── */
+    .callout {
+      background: #FFFBF0;
+      border: 1px solid #F0DFA8;
+      border-left: 3px solid #C8960A;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin: 10px 0 4px;
+      font-size: 13px;
+      color: #7A5C10;
+      line-height: 1.8;
+    }
+
+    /* ── Rights grid ── */
+    .rights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .right-tag {
+      background: var(--accent-light);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 13px;
+      color: var(--accent);
+      text-align: center;
+    }
+
+    /* ── Security badge ── */
+    .security-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .sec-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--green-light);
+      border: 1px solid var(--green-border);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--green);
+    }
+
+    .sec-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Contact box ── */
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .contact-icon {
+      width: 42px; height: 42px;
+      background: var(--accent-light);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .contact-info p { font-size: 12px; color: var(--text-muted); margin-bottom: 3px; }
+
+    .contact-info a {
+      font-size: 15px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .contact-info a:hover { text-decoration: underline; }
+
+    .footer {
+      text-align: center;
+      margin-top: 32px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 2;
+    }
+
+    @media (max-width: 480px) {
+      .header h1 { font-size: 22px; }
+      .card-header { padding: 13px 16px; }
+      .card-body { padding: 16px; }
+      .rights-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- Header -->
+  <div class="header">
+    <p class="header-eyebrow">请在使用前仔细阅读</p>
+    <h1>《隐私政策》</h1>
+    <p class="header-sub">Folio &nbsp;·&nbsp; 生效日期：[2026 年 04 月 21 日]</p>
+    <div class="header-divider"></div>
+  </div>
+
+  <!-- Intro -->
+  <div class="intro-box">
+    「Folio」（以下简称"我们"）非常重视你的个人信息与隐私保护。本《隐私政策》将说明我们如何收集、使用、存储、共享与保护你的信息，以及你享有的权利。请你在使用前仔细阅读。
+  </div>
+
+  <!-- 1. 我们收集的信息 -->
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">1</div>
+      <span class="card-title">我们收集的信息</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>我们遵循合法、正当、必要和诚信原则，仅收集实现功能所必要的信息。根据你使用的功能，可能包括：</p>
+      </div>
+
+      <div class="item">
+        <div class="item-label">1.1 账号与登录信息</div>
+        <p>当你使用 Apple 登录等方式登录时，我们可能获取第三方返回的标识信息（例如 Apple 用户标识）以及你授权展示的基础信息（如昵称/邮箱，具体以授权页面为准）。</p>
+      </div>
+
+      <div class="item">
+        <div class="item-label">1.2 你主动提供或生成的内容</div>
+        <p>你在本软件中创建、编辑、上传、保存的内容，例如笔记文本、图片、扫描件、册子与封面相关信息等。</p>
+      </div>
+
+      <div class="item">
+        <div class="item-label">1.3 本地安全相关（面容锁 / 密码锁）</div>
+        <p>面容/指纹等生物识别验证由 iOS 系统在设备本地完成；我们通常<strong>不会</strong>收集或上传你的面部/指纹图像或模板。</p>
+        <p>若你启用应用内密码锁，相关密码信息将按产品实现保存在你的设备本地（例如本地存储机制），用于解锁校验。</p>
+      </div>
+
+      <div class="item">
+        <div class="item-label">1.4 同步与存储</div>
+        <p>若你启用 iCloud 同步或类似能力，相关数据将按系统机制存储于你的 iCloud 账户下，并受 Apple 相关政策约束。</p>
+      </div>
+
+      <div class="item">
+        <div class="item-label">1.5 网络与技术服务所需信息（如适用）</div>
+        <p>为实现登录、账号管理、册子/内容同步与存储等你主动使用的产品功能，本软件会通过加密传输（HTTPS）的方式访问我们的独立后端服务。在此过程中，我们可能处理以下必要信息：</p>
+        <ul class="bul">
+          <li><strong>账号与鉴权信息：</strong>登录成功后服务端返回的访问令牌、用户标识等（用于后续请求鉴权）</li>
+          <li><strong>业务内容数据：</strong>你在本软件中创建、编辑、上传、保存的内容数据（如笔记、图片、扫描件、册子信息等，以你实际使用为准）</li>
+          <li><strong>基础请求信息：</strong>为实现服务所必要的请求时间、接口返回的业务错误信息等（用于问题排查与安全保障）</li>
+        </ul>
+        <div class="callout">
+          <strong>关于数据出境：</strong>我们当前不会将您的个人信息主动传输至境外；相关数据存储与处理位于中华人民共和国境内（[阿里云服务器：上海]）。若未来因业务需要发生跨境传输，我们将依法另行取得单独同意或采取其他合规措施，并更新本政策。
+        </div>
+        <p style="margin-top:8px;">如你访问网络图片资源，客户端可能根据链接加载图片内容。</p>
+      </div>
+
+      <div class="item">
+        <div class="item-label">1.6 设备与日志信息（如适用）</div>
+        <p>当前版本未接入第三方统计/广告 SDK（如友盟、Firebase Analytics 等），因此不会通过此类 SDK 收集你的行为画像或广告标识数据。</p>
+        <p>若我们后续接入用于稳定性与安全的统计/诊断能力，我们将在本政策中说明 SDK 名称、处理目的、收集字段类型，并在需要时征得你的同意。</p>
+        <div class="callout">
+          我们不会以"强制索取无关权限"的方式收集信息；你可以在系统设置中管理权限。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 如何使用信息 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">2</div>
+      <span class="card-title">我们如何使用信息</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>我们仅在实现产品功能、保障安全、履行法定义务、经你同意等合法情形下使用信息，包括：</p>
+        <ul class="bul">
+          <li>提供与改进服务（例如展示你的内容、完成同步、修复问题）；</li>
+          <li>身份验证与安全风控（例如登录校验、异常提示）；</li>
+          <li>遵守法律法规、响应监管机关合法要求。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 共享、转让与公开披露 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">3</div>
+      <span class="card-title">共享、转让与公开披露</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">3.1 不出售原则</div>
+        <p>我们不会将您的个人信息出售给任何第三方。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">3.2 例外情形</div>
+        <p>在以下情形中，我们可能共享或披露信息：</p>
+        <ul class="bul">
+          <li><strong>依法提供：</strong>根据法律法规、诉讼/仲裁、政府机关合法要求；</li>
+          <li><strong>经你同意：</strong>在你明确授权的前提下；</li>
+          <li><strong>服务必要：</strong>为实现本软件功能，我们可能需要委托处理方或合作方在境内提供服务器托管、网络加速、安全防护等技术服务。我们会要求受托方采取合理保护措施，并仅在实现目的所必需的范围内处理信息。</li>
+        </ul>
+      </div>
+      <div class="item">
+        <div class="item-label">3.3 企业变更</div>
+        <p>如发生合并、分立、收购等情形，我们会要求继受方继续受本政策约束；如变更处理目的，将重新取得同意（如适用）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 保存期限 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">4</div>
+      <span class="card-title">保存期限</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>我们在实现目的所必需的期限内保存信息，超出期限后将删除或匿名化，除非法律法规另有要求。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 你的权利 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">5</div>
+      <span class="card-title">你的权利</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>在符合适用法律的前提下，你可以行使以下权利。你可以通过本政策末尾联系方式向我们提出请求，我们将在合理期限内处理。</p>
+        <div class="rights-grid">
+          <div class="right-tag">查阅与复制</div>
+          <div class="right-tag">更正与补充</div>
+          <div class="right-tag">删除信息</div>
+          <div class="right-tag">撤回同意</div>
+          <div class="right-tag">注销账号</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 未成年人保护 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">6</div>
+      <span class="card-title">未成年人保护</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>若你为未成年人，请在监护人指导下阅读并使用本软件。监护人应合理引导未成年人并提供必要同意（如适用）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. 信息安全 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">7</div>
+      <span class="card-title">信息安全</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>我们采取合理可行的技术与管理措施保护信息安全，但请理解任何系统都无法保证绝对安全。请你妥善保管设备与账号安全。</p>
+        <div class="security-row">
+          <div class="sec-badge">HTTPS 加密传输</div>
+          <div class="sec-badge">访问权限控制</div>
+          <div class="sec-badge">数据最小化原则</div>
+          <div class="sec-badge">本地生物识别</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. 本政策更新 -->
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">8</div>
+      <span class="card-title">本政策更新</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>我们可能更新本政策。更新后，我们会通过适当方式提示重大变更；你继续使用即视为接受更新版本（如法律要求单独同意，我们将按法规执行）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. 联系我们 -->
+  <div class="contact-box">
+    <div class="contact-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2B4C8C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <path d="M2 7l10 7 10-7"/>
+      </svg>
+    </div>
+    <div class="contact-info">
+      <p>第 9 条 · 联系我们</p>
+      <a href="mailto:2858401629@qq.com">2858401629@qq.com</a>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>© Folio &nbsp;·&nbsp; 如对本政策有任何疑问，欢迎通过上述邮箱与我们联系</p>
+  </div>
+
+</div>
+<script>
+  function toggle(header) {
+    header.closest('.card').classList.toggle('open');
+  }
+</script>
+</body>
+</html>
