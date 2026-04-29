@@ -6,14 +6,14 @@
 - MySQL 连通性与表自动建表（`users`、`categories`、`skins`、`books`）
 - 皮肤图片上传（原图 + 缩略图）、`skins` 表入库与列表查询
 - 本地上传目录的静态访问（`GET /uploads/...`）
-- 用户须知与隐私协议页面（`GET /notice`、`GET /privacy`，浏览器直接打开链接即可）
+- 用户须知、隐私协议与技术支持页面（`GET /notice`、`GET /privacy`、`GET /support`，浏览器直接打开链接即可）
 
 ## 目录结构
 
 ```text
 .
 ├── index.js                  # 启动入口（仅负责启动和优雅退出）
-├── public                    # 静态页面（用户须知、隐私协议等 HTML）
+├── public                    # 静态页面（用户须知、隐私协议、技术支持等 HTML）
 ├── src
 │   ├── router.js             # 自动扫描 src/routes 并注册路由
 │   ├── routes                # 每个接口一个文件
@@ -50,6 +50,7 @@ module.exports = { handleDemo };
 - `GET /`：服务运行提示
 - `GET /notice`：用户须知（HTML 页面，可直接在浏览器中打开）
 - `GET /privacy`：隐私协议（HTML 页面，可直接在浏览器中打开）
+- `GET /support`：技术支持（HTML 页面，可直接在浏览器中打开）
 - `GET /health`：健康检查
 - `POST /echo`：回显 JSON Body
 - `GET /db/ping`：MySQL 连通性检查
@@ -78,6 +79,11 @@ module.exports = { handleDemo };
 
 - **鉴权**：无。
 - **行为**：返回 **`text/html`** 隐私协议页面（内容由仓库内 `public/privacy.html` 提供）。可直接在浏览器访问，例如：`http://<主机>:<端口>/privacy`。
+
+### `GET /support`
+
+- **鉴权**：无。
+- **行为**：返回 **`text/html`** 技术支持页面（内容由仓库内 `public/support.html` 提供）。可直接在浏览器访问，例如：`http://<主机>:<端口>/support`。
 
 ### `GET /categories`
 

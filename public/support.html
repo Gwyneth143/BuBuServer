@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>技术支持 · 拾页手帐</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F6F4EF;
+      --surface: #FFFFFF;
+      --border: #E4DFD7;
+      --text-primary: #1C1A17;
+      --text-secondary: #5C574F;
+      --text-muted: #9C9790;
+      --accent: #2B4C8C;
+      --accent-light: #EDF1F9;
+      --accent-border: #C3D0E8;
+      --radius-lg: 12px;
+      --radius: 6px;
+    }
+    body {
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.85;
+      min-height: 100vh;
+      padding: 52px 16px 88px;
+    }
+    .page-wrapper { max-width: 740px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 44px; }
+    .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+    .header-sub { font-size: 13px; color: var(--text-muted); }
+    .header-divider {
+      width: 44px; height: 2px; background: var(--accent);
+      margin: 18px auto 0; border-radius: 2px;
+    }
+    .intro-box {
+      background: var(--accent-light);
+      border: 1px solid var(--accent-border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      font-size: 14px;
+      color: var(--accent);
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 15px 22px; cursor: pointer; user-select: none;
+      border-bottom: 1px solid transparent; transition: background 0.15s;
+    }
+    .card-header:hover { background: #FAFAF7; }
+    .card.open .card-header { border-bottom-color: var(--border); }
+    .card-num {
+      width: 26px; height: 26px; background: var(--accent); color: #fff;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 500; flex-shrink: 0;
+    }
+    .card-title { font-size: 15px; font-weight: 500; color: var(--text-primary); flex: 1; }
+    .card-arrow { font-size: 11px; color: var(--text-muted); transition: transform 0.22s; }
+    .card.open .card-arrow { transform: rotate(90deg); }
+    .card-body { display: none; padding: 20px 22px 22px; }
+    .card.open .card-body { display: block; }
+    .item { margin-bottom: 16px; }
+    .item:last-child { margin-bottom: 0; }
+    .item-label { font-size: 12px; font-weight: 500; color: var(--accent); margin-bottom: 5px; }
+    .item p, .item li { font-size: 14px; color: var(--text-secondary); }
+    .item ul { margin-left: 18px; }
+    .item li { margin-bottom: 6px; }
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      margin-bottom: 14px;
+    }
+    .contact-box a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .contact-box a:hover { text-decoration: underline; }
+    .footer { text-align: center; margin-top: 32px; font-size: 12px; color: var(--text-muted); }
+    @media (max-width: 480px) {
+      .header h1 { font-size: 22px; }
+      .card-header { padding: 13px 16px; }
+      .card-body { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+  <div class="header">
+    <h1>技术支持</h1>
+    <p class="header-sub">拾页手帐 · 常见问题与联系方式</p>
+    <div class="header-divider"></div>
+  </div>
+
+  <div class="intro-box">
+    如你在使用过程中遇到问题，可先查看下方常见排查建议；若仍未解决，请通过页面底部联系方式提交反馈。
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">1</div>
+      <span class="card-title">常见问题排查</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <div class="item-label">1.1 登录失败</div>
+        <p>请确认网络连接正常、系统时间准确，并确保 Apple 登录已在系统设置中可用。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">1.2 图片或册子显示异常</div>
+        <p>请尝试下拉刷新，或退出后重新进入应用；如问题持续，可附上截图与操作步骤反馈。</p>
+      </div>
+      <div class="item">
+        <div class="item-label">1.3 同步不及时</div>
+        <p>请检查 iCloud 与网络状态，确认设备存储空间充足，并稍后重试。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">2</div>
+      <span class="card-title">反馈建议格式</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>为更快定位问题，建议反馈中包含：</p>
+        <ul>
+          <li>设备型号与系统版本</li>
+          <li>问题发生时间与操作步骤</li>
+          <li>错误截图或录屏（如有）</li>
+          <li>当前应用版本号</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-num">3</div>
+      <span class="card-title">响应说明</span>
+      <span class="card-arrow">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="item">
+        <p>我们会在收到反馈后尽快处理，复杂问题可能需要更多排查时间。感谢你的理解与支持。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="contact-box">
+    <p>技术支持邮箱：</p>
+    <a href="mailto:2858401629@qq.com">2858401629@qq.com</a>
+  </div>
+
+  <div class="footer">
+    <p>© 拾页手帐 · 技术支持页面</p>
+  </div>
+</div>
+<script>
+  function toggle(header) {
+    header.closest(".card").classList.toggle("open");
+  }
+</script>
+</body>
+</html>
