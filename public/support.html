@@ -1,176 +1,466 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>技术支持 · 拾页手帐</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾页手账 · 技术支持</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     :root {
-      --bg: #F6F4EF;
-      --surface: #FFFFFF;
-      --border: #E4DFD7;
-      --text-primary: #1C1A17;
-      --text-secondary: #5C574F;
-      --text-muted: #9C9790;
-      --accent: #2B4C8C;
-      --accent-light: #EDF1F9;
-      --accent-border: #C3D0E8;
+      --bg-primary: #ffffff;
+      --bg-secondary: #f6f5f2;
+      --bg-tertiary: #f0ede8;
+      --text-primary: #1a1917;
+      --text-secondary: #6b6965;
+      --border: rgba(0,0,0,0.1);
+      --border-em: rgba(0,0,0,0.18);
+      --accent: #7F77DD;
+      --accent-bg: #EEEDFE;
+      --accent-dark: #534AB7;
+      --accent-darker: #3C3489;
+      --radius-md: 8px;
       --radius-lg: 12px;
-      --radius: 6px;
     }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1c1b19;
+        --bg-secondary: #242321;
+        --bg-tertiary: #2c2a27;
+        --text-primary: #f0ede8;
+        --text-secondary: #a09d97;
+        --border: rgba(255,255,255,0.1);
+        --border-em: rgba(255,255,255,0.18);
+        --accent: #AFA9EC;
+        --accent-bg: #26215C;
+        --accent-dark: #AFA9EC;
+        --accent-darker: #CECBF6;
+      }
+    }
+
+    html { scroll-behavior: smooth; }
+
     body {
-      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-      background: var(--bg);
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+      background: var(--bg-tertiary);
       color: var(--text-primary);
-      line-height: 1.85;
       min-height: 100vh;
-      padding: 52px 16px 88px;
+      padding: 2rem 1rem 4rem;
+      line-height: 1.7;
     }
-    .page-wrapper { max-width: 740px; margin: 0 auto; }
-    .header { text-align: center; margin-bottom: 44px; }
-    .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
-    .header-sub { font-size: 13px; color: var(--text-muted); }
-    .header-divider {
-      width: 44px; height: 2px; background: var(--accent);
-      margin: 18px auto 0; border-radius: 2px;
-    }
-    .intro-box {
-      background: var(--accent-light);
-      border: 1px solid var(--accent-border);
-      border-left: 3px solid var(--accent);
-      border-radius: var(--radius-lg);
-      padding: 16px 20px;
-      margin-bottom: 28px;
-      font-size: 14px;
-      color: var(--accent);
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      margin-bottom: 14px;
+
+    .sy-wrap {
+      max-width: 640px;
+      margin: 0 auto;
+      background: var(--bg-primary);
+      border-radius: 18px;
+      border: 0.5px solid var(--border);
       overflow: hidden;
     }
-    .card-header {
-      display: flex; align-items: center; gap: 12px;
-      padding: 15px 22px; cursor: pointer; user-select: none;
-      border-bottom: 1px solid transparent; transition: background 0.15s;
+
+    /* Hero */
+    .sy-hero {
+      text-align: center;
+      padding: 3rem 2rem 2rem;
+      border-bottom: 0.5px solid var(--border);
+      background: var(--bg-primary);
     }
-    .card-header:hover { background: #FAFAF7; }
-    .card.open .card-header { border-bottom-color: var(--border); }
-    .card-num {
-      width: 26px; height: 26px; background: var(--accent); color: #fff;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 500; flex-shrink: 0;
+
+    .sy-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 1.2rem;
+      display: block;
     }
-    .card-title { font-size: 15px; font-weight: 500; color: var(--text-primary); flex: 1; }
-    .card-arrow { font-size: 11px; color: var(--text-muted); transition: transform 0.22s; }
-    .card.open .card-arrow { transform: rotate(90deg); }
-    .card-body { display: none; padding: 20px 22px 22px; }
-    .card.open .card-body { display: block; }
-    .item { margin-bottom: 16px; }
-    .item:last-child { margin-bottom: 0; }
-    .item-label { font-size: 12px; font-weight: 500; color: var(--accent); margin-bottom: 5px; }
-    .item p, .item li { font-size: 14px; color: var(--text-secondary); }
-    .item ul { margin-left: 18px; }
-    .item li { margin-bottom: 6px; }
-    .contact-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
+
+    .sy-title {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--text-primary);
+      margin-bottom: 0.4rem;
+    }
+
+    .sy-subtitle {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      font-weight: 300;
+      letter-spacing: 0.06em;
+    }
+
+    /* Content area */
+    .sy-body {
+      padding: 2rem 2rem 1.5rem;
+    }
+
+    .sy-intro {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.85;
+      margin-bottom: 2rem;
+      padding-bottom: 2rem;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    /* Section */
+    .sy-section {
+      margin-bottom: 2rem;
+    }
+
+    .sy-section-title {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sy-section-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 15px;
+      border-radius: 2px;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* Contact card */
+    .sy-contact-card {
+      background: var(--bg-secondary);
       border-radius: var(--radius-lg);
-      padding: 20px 22px;
-      margin-bottom: 14px;
+      border: 0.5px solid var(--border);
+      overflow: hidden;
     }
-    .contact-box a { color: var(--accent); text-decoration: none; font-weight: 500; }
-    .contact-box a:hover { text-decoration: underline; }
-    .footer { text-align: center; margin-top: 32px; font-size: 12px; color: var(--text-muted); }
+
+    .sy-contact-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    .sy-contact-row:last-child {
+      border-bottom: none;
+    }
+
+    .sy-contact-label {
+      color: var(--text-secondary);
+      font-size: 12px;
+      white-space: nowrap;
+      padding-top: 1px;
+      min-width: 90px;
+    }
+
+    .sy-contact-value {
+      font-size: 13px;
+      color: var(--text-primary);
+      word-break: break-all;
+    }
+
+    .sy-contact-value a {
+      color: var(--accent-dark);
+      text-decoration: none;
+    }
+
+    .sy-contact-value a:hover {
+      text-decoration: underline;
+    }
+
+    .sy-tag {
+      display: inline-block;
+      background: var(--accent-bg);
+      color: var(--accent-darker);
+      border-radius: var(--radius-md);
+      font-size: 11.5px;
+      padding: 2px 9px;
+      word-break: break-all;
+    }
+
+    /* Chips */
+    .sy-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .sy-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg-secondary);
+      border: 0.5px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+
+    .sy-chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* FAQ */
+    .sy-faq {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sy-faq-item {
+      background: var(--bg-primary);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .sy-faq-q {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.8rem 1rem;
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text-primary);
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .sy-faq-q:hover {
+      background: var(--bg-secondary);
+    }
+
+    .sy-faq-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent-bg);
+      color: var(--accent-dark);
+      font-size: 11px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .sy-faq-arrow {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--text-secondary);
+      transition: transform 0.2s ease;
+    }
+
+    .sy-faq-item.open .sy-faq-arrow {
+      transform: rotate(180deg);
+    }
+
+    .sy-faq-a {
+      display: none;
+      padding: 0.75rem 1rem 0.85rem 2.6rem;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      border-top: 0.5px solid var(--border);
+    }
+
+    .sy-faq-item.open .sy-faq-a {
+      display: block;
+    }
+
+    /* Links */
+    .sy-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .sy-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border: 0.5px solid var(--border-em);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--text-primary);
+      text-decoration: none;
+      background: var(--bg-primary);
+      cursor: pointer;
+      transition: background 0.15s;
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+
+    .sy-link-btn:hover {
+      background: var(--bg-secondary);
+    }
+
+    .sy-divider {
+      border: none;
+      border-top: 0.5px solid var(--border);
+      margin: 1.5rem 0;
+    }
+
+    /* Footer */
+    .sy-footer {
+      background: var(--bg-secondary);
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 1.2rem;
+      border-top: 0.5px solid var(--border);
+      letter-spacing: 0.02em;
+    }
+
+    /* Responsive */
     @media (max-width: 480px) {
-      .header h1 { font-size: 22px; }
-      .card-header { padding: 13px 16px; }
-      .card-body { padding: 16px; }
+      body { padding: 0; }
+      .sy-wrap { border-radius: 0; border-left: none; border-right: none; }
+      .sy-body { padding: 1.5rem 1.25rem 1rem; }
+      .sy-hero { padding: 2rem 1.25rem 1.5rem; }
+      .sy-contact-label { min-width: 78px; font-size: 11.5px; }
     }
   </style>
 </head>
 <body>
-<div class="page-wrapper">
-  <div class="header">
-    <h1>技术支持</h1>
-    <p class="header-sub">拾页手帐 · 常见问题与联系方式</p>
-    <div class="header-divider"></div>
-  </div>
 
-  <div class="intro-box">
-    如你在使用过程中遇到问题，可先查看下方常见排查建议；若仍未解决，请通过页面底部联系方式提交反馈。
-  </div>
+  <div class="sy-wrap">
 
-  <div class="card open">
-    <div class="card-header" onclick="toggle(this)">
-      <div class="card-num">1</div>
-      <span class="card-title">常见问题排查</span>
-      <span class="card-arrow">▶</span>
+    <div class="sy-hero">
+      <svg class="sy-icon" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="60" height="60" rx="16" fill="#EEEDFE"/>
+        <rect x="14" y="15" width="32" height="4" rx="2" fill="#7F77DD"/>
+        <rect x="14" y="23" width="24" height="2.5" rx="1.25" fill="#AFA9EC"/>
+        <rect x="14" y="29" width="28" height="2.5" rx="1.25" fill="#AFA9EC"/>
+        <rect x="14" y="35" width="18" height="2.5" rx="1.25" fill="#AFA9EC"/>
+        <circle cx="44" cy="43" r="8" fill="#534AB7"/>
+        <path d="M40.5 43h7M44 39.5v7" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <h1 class="sy-title">拾页手账 · 技术支持</h1>
+      <p class="sy-subtitle">Technical Support</p>
     </div>
-    <div class="card-body">
-      <div class="item">
-        <div class="item-label">1.1 登录失败</div>
-        <p>请确认网络连接正常、系统时间准确，并确保 Apple 登录已在系统设置中可用。</p>
+
+    <div class="sy-body">
+
+      <p class="sy-intro">欢迎使用拾页手账。如果你在使用过程中遇到问题（登录、同步、扫描、数据异常等），可通过以下方式联系我们，我们会尽快处理。</p>
+
+      <div class="sy-section">
+        <h2 class="sy-section-title">联系我们</h2>
+        <div class="sy-contact-card">
+          <div class="sy-contact-row">
+            <span class="sy-contact-label">技术支持邮箱</span>
+            <span class="sy-contact-value"><a href="2858401629@qq.com">2858401629@qq.com</a></span>
+          </div>
+          <div class="sy-contact-row">
+            <span class="sy-contact-label">反馈主题建议</span>
+            <span class="sy-contact-value"><span class="sy-tag">【拾页手账】问题类型 + 设备型号</span></span>
+          </div>
+          <div class="sy-contact-row">
+            <span class="sy-contact-label">响应时间</span>
+            <span class="sy-contact-value">3–5 个工作日</span>
+          </div>
+        </div>
       </div>
-      <div class="item">
-        <div class="item-label">1.2 图片或册子显示异常</div>
-        <p>请尝试下拉刷新，或退出后重新进入应用；如问题持续，可附上截图与操作步骤反馈。</p>
+
+      <div class="sy-section">
+        <h2 class="sy-section-title">反馈时请提供</h2>
+        <p style="font-size:13.5px;color:var(--text-secondary);margin-bottom:0.85rem;">为更快定位问题，请尽量附上以下信息：</p>
+        <div class="sy-chips">
+          <div class="sy-chip"><span class="sy-chip-dot"></span>App 版本号</div>
+          <div class="sy-chip"><span class="sy-chip-dot"></span>iOS 系统版本</div>
+          <div class="sy-chip"><span class="sy-chip-dot"></span>设备型号（如 iPhone 15）</div>
+          <div class="sy-chip"><span class="sy-chip-dot"></span>问题发生时间</div>
+          <div class="sy-chip"><span class="sy-chip-dot"></span>问题描述与复现步骤</div>
+          <div class="sy-chip"><span class="sy-chip-dot"></span>相关截图（如有）</div>
+        </div>
       </div>
-      <div class="item">
-        <div class="item-label">1.3 同步不及时</div>
-        <p>请检查 iCloud 与网络状态，确认设备存储空间充足，并稍后重试。</p>
+
+      <div class="sy-section">
+        <h2 class="sy-section-title">常见问题（FAQ）</h2>
+        <div class="sy-faq">
+
+          <div class="sy-faq-item">
+            <div class="sy-faq-q" onclick="toggle(this)">
+              <span class="sy-faq-num">1</span>无法登录怎么办？<span class="sy-faq-arrow">▼</span>
+            </div>
+            <div class="sy-faq-a">请确认网络连接正常，并使用「通过 Apple 登录」完成授权。若仍失败，请附上报错截图联系我们。</div>
+          </div>
+
+          <div class="sy-faq-item">
+            <div class="sy-faq-q" onclick="toggle(this)">
+              <span class="sy-faq-num">2</span>扫描功能无法使用怎么办？<span class="sy-faq-arrow">▼</span>
+            </div>
+            <div class="sy-faq-a">请在系统「设置 - 隐私与安全性 - 相机」中确认已允许拾页手账访问相机权限。</div>
+          </div>
+
+          <div class="sy-faq-item">
+            <div class="sy-faq-q" onclick="toggle(this)">
+              <span class="sy-faq-num">3</span>无法从相册导入图片怎么办？<span class="sy-faq-arrow">▼</span>
+            </div>
+            <div class="sy-faq-a">请在系统「设置 - 隐私与安全性 - 照片」中为拾页手账开启照片访问权限。</div>
+          </div>
+
+          <div class="sy-faq-item">
+            <div class="sy-faq-q" onclick="toggle(this)">
+              <span class="sy-faq-num">4</span>数据没有同步怎么办？<span class="sy-faq-arrow">▼</span>
+            </div>
+            <div class="sy-faq-a">请确认 iCloud 已登录、网络正常，并在 App 内开启同步选项后重试。</div>
+          </div>
+
+          <div class="sy-faq-item">
+            <div class="sy-faq-q" onclick="toggle(this)">
+              <span class="sy-faq-num">5</span>如何删除账号与数据？<span class="sy-faq-arrow">▼</span>
+            </div>
+            <div class="sy-faq-a">请在 App 内「我的 / 设置」页面进入账号管理，按指引进行账号注销与数据删除。如遇异常，请联系技术支持邮箱协助处理。</div>
+          </div>
+
+        </div>
       </div>
+
+      <div class="sy-section">
+        <h2 class="sy-section-title">隐私与条款</h2>
+        <div class="sy-links">
+          <a class="sy-link-btn" href="https://xsmb.world/privacy" target="_blank">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 2v4l2.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            隐私政策
+          </a>
+          <a class="sy-link-btn" href="https://xsmb.world/notice" target="_blank">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="1.5" width="9" height="11" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M5 5h4M5 7.5h4M5 10h2.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+            用户协议
+          </a>
+        </div>
+      </div>
+
     </div>
+
+    <div class="sy-footer">
+      © 2026 拾页手账. All Rights Reserved.
+    </div>
+
   </div>
 
-  <div class="card">
-    <div class="card-header" onclick="toggle(this)">
-      <div class="card-num">2</div>
-      <span class="card-title">反馈建议格式</span>
-      <span class="card-arrow">▶</span>
-    </div>
-    <div class="card-body">
-      <div class="item">
-        <p>为更快定位问题，建议反馈中包含：</p>
-        <ul>
-          <li>设备型号与系统版本</li>
-          <li>问题发生时间与操作步骤</li>
-          <li>错误截图或录屏（如有）</li>
-          <li>当前应用版本号</li>
-        </ul>
-      </div>
-    </div>
-  </div>
+  <script>
+    function toggle(el) {
+      const item = el.closest('.sy-faq-item');
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.sy-faq-item.open').forEach(i => i.classList.remove('open'));
+      if (!isOpen) item.classList.add('open');
+    }
+  </script>
 
-  <div class="card">
-    <div class="card-header" onclick="toggle(this)">
-      <div class="card-num">3</div>
-      <span class="card-title">响应说明</span>
-      <span class="card-arrow">▶</span>
-    </div>
-    <div class="card-body">
-      <div class="item">
-        <p>我们会在收到反馈后尽快处理，复杂问题可能需要更多排查时间。感谢你的理解与支持。</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="contact-box">
-    <p>技术支持邮箱：</p>
-    <a href="mailto:2858401629@qq.com">2858401629@qq.com</a>
-  </div>
-
-  <div class="footer">
-    <p>© 拾页手帐 · 技术支持页面</p>
-  </div>
-</div>
-<script>
-  function toggle(header) {
-    header.closest(".card").classList.toggle("open");
-  }
-</script>
 </body>
 </html>
