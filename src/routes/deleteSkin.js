@@ -1,5 +1,3 @@
-const fs = require("fs").promises;
-const path = require("path");
 const { readJsonBody, sendJson, getBearerToken } = require("../utils/http");
 const { verifyAppJwt } = require("../services/jwt");
 const { deleteSkinByOwner } = require("../services/db");
@@ -8,24 +6,6 @@ function getPathname(url) {
   if (!url) return "";
   const q = url.indexOf("?");
   return q === -1 ? url : url.slice(0, q);
-}
-
-function diskPathFromPublicUrl(fullUrl) {
-  if (!fullUrl || typeof fullUrl !== "string") return null;
-  const marker = "/uploads/";
-  const i = fullUrl.indexOf(marker);
-  if (i === -1) return null;
-  const rel = fullUrl.slice(i + marker.length).replace(/^\/+/, "");
-  return path.join(process.cwd(), process.env.UPLOAD_ROOT || "uploads", rel);
-}
-
-async function safeUnlink(filePath) {
-  if (!filePath) return;
-  try {
-    await fs.unlink(filePath);
-  } catch (err) {
-    if (err && err.code !== "ENOENT") throw err;
-  }
 }
 
 async function handleDeleteSkin(req, res) {
@@ -78,13 +58,14 @@ async function handleDeleteSkin(req, res) {
       });
       return true;
     }
+    if (result.alreadyDeleted) {
+      sendJson(res, 409, { error: "Skin already deleted" });
+      return true;
+    }
     if (!result.removed) {
       sendJson(res, 500, { error: "Failed to delete skin" });
       return true;
     }
-
-    await safeUnlink(diskPathFromPublicUrl(result.imageUrl));
-    await safeUnlink(diskPathFromPublicUrl(result.thumbUrl));
 
     sendJson(res, 200, { ok: true, skinId });
   } catch (err) {

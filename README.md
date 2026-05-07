@@ -61,10 +61,11 @@ module.exports = { handleDemo };
 - `POST /books`：上传册子（需 JWT，请求体 `title`、`category_name`、`skinId`）
 - `POST /books/delete`：删除册子（需 JWT，请求体 `bookId`；软删除，仅创建者）
 - `POST /books/update`：刷新册子更新时间（需 JWT，请求体 `bookId`；仅创建者）
+- `POST /users/delete`：删除当前用户及关联数据（需 JWT）
 - `GET /skins`：皮肤列表（可选查询参数，见下文）
 - `GET /skins/system`：系统皮肤列表（仅系统预置皮肤，支持分页）
 - `POST /skins`：上传皮肤（multipart，需 JWT）
-- `POST /skins/delete`：删除皮肤（需 JWT，请求体 `skinId`；仅创建者可删；会同步清理图库关联与本地文件）
+- `POST /skins/delete`：删除皮肤（需 JWT，请求体 `skinId`；仅创建者可删；软删除）
 - `POST /my/skins`：用户选择一款皮肤加入自己的图库（需 JWT）
 - `GET /my/skins`：获取我的图库列表（需 JWT，支持分页）
 - `POST /my/skins/delete`：从图库移除一条收藏（需 JWT，请求体 `userSkinId` 为 `user_skins.id`）
@@ -79,6 +80,20 @@ module.exports = { handleDemo };
 
 - **鉴权**：无。
 - **行为**：返回 **`text/html`** 隐私协议页面（内容由仓库内 `public/privacy.html` 提供）。可直接在浏览器访问，例如：`http://<主机>:<端口>/privacy`。
+
+### `POST /users/delete`
+
+- **鉴权**：`Authorization: Bearer <JWT>`。
+- **请求体**：无需（会根据 JWT `sub` 删除当前用户）。
+- **行为**：删除当前用户及关联数据，包含：
+  - `users` 当前用户记录
+  - `categories` 中该用户创建的分类
+  - `books` 中该用户创建的册子
+  - `skins` 中该用户创建的皮肤
+  - `user_skins` 中该用户收藏记录，以及引用了该用户皮肤的收藏记录
+  - 同步尝试删除该用户皮肤对应的本地上传文件（原图/缩略图）
+- **成功响应**：`{ "ok": true, "removed": { "users", "categories", "books", "skins", "userSkinsByUser", "userSkinsBySkin" } }`
+- **常见错误**：`401` 未带或无效 token；`404` 用户不存在
 
 ### `GET /support`
 
@@ -156,6 +171,7 @@ module.exports = { handleDemo };
 ### `GET /skins`
 
 - **鉴权**：无（公开列表；按需可在路由层自行加鉴权）。
+- **行为**：仅返回 `skins.is_delete = 0` 的皮肤。
 - **查询参数**（均可选，可组合）：
   - **`type`**：`SMALLINT` 整数，范围 **-32768～32767**，按 `skins.type` 精确筛选；不传或空字符串表示不按类型筛选。
   - **`creatorUserId`**：不传则不过滤创建者；传空或字面量 `null` 表示只查 **`creator_user_id IS NULL`**；传正整数表示只查该用户创建的皮肤。
@@ -172,7 +188,7 @@ module.exports = { handleDemo };
 ### `GET /skins/system`
 
 - **鉴权**：无。
-- **行为**：返回系统皮肤列表。当前约定系统皮肤为 `skins.creator_user_id IS NULL` 的记录。
+- **行为**：返回系统皮肤列表。当前约定系统皮肤为 `skins.creator_user_id IS NULL` 且 `skins.is_delete = 0` 的记录。
 - **查询参数**：
   - `type`：可选，`SMALLINT` 整数筛选。
   - `page`：页码，默认 `1`。
@@ -192,7 +208,7 @@ module.exports = { handleDemo };
 ### `GET /my/skins`
 
 - **鉴权**：`Authorization: Bearer <JWT>`。
-- **行为**：返回当前用户已加入图库的皮肤列表（基于 `user_skins` 关联 `skins`）。
+- **行为**：返回当前用户已加入图库的皮肤列表（基于 `user_skins` 关联 `skins`，且 `skins.is_delete = 0`）。
 - **查询参数**（可选）：
   - `type`：`SMALLINT` 整数筛选（-32768 ~ 32767）
   - `page`：页码，默认 `1`
@@ -235,10 +251,9 @@ module.exports = { handleDemo };
 - **请求体**：`application/json`，字段 **`skinId`**（正整数），即 **`skins.id`**。
 - **行为**：
   - 仅当 **`skins.creator_user_id`** 等于当前用户（JWT `sub`）时可删；**系统皮肤**（`creator_user_id IS NULL`）不能通过本接口删除，返回 **403**。
-  - 先删除 **`user_skins`** 中引用该皮肤的记录，再删除 **`skins`** 行。
-  - 根据 `imageUrl` / `thumbUrl` 解析 **`/uploads/...`** 路径并尝试删除磁盘文件（缺失则忽略）。
+  - 软删除：将 **`skins.is_delete`** 置为 `1`。
 - **成功响应**：`{ "ok": true, "skinId": <number> }`
-- **常见错误**：`401`；`400` `skinId` 非法；`403` 无权限；`404` 皮肤不存在
+- **常见错误**：`401`；`400` `skinId` 非法；`403` 无权限；`404` 皮肤不存在；`409` 皮肤已删除
 
 ### `GET /uploads/...`
 
@@ -255,6 +270,7 @@ module.exports = { handleDemo };
 | `is_member_exclusive` | 是否会员专属 |
 | `image_url` / `thumb_url` | 原图与缩略图完整 URL |
 | `creator_user_id` | 可选，创建者 `users.id` |
+| `is_delete` | 软删除标记（`0`/`1`） |
 | `created_at` | 创建时间 |
 
 ### 表 `user_skins` 概要

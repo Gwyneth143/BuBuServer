@@ -204,6 +204,11 @@ async function migrateSkinsTableIfNeeded(pool) {
       console.error("Could not add idx_creator_user:", msg);
     }
   }
+  if (!(await columnExists(pool, table, "is_delete"))) {
+    await pool.query(
+      `ALTER TABLE \`${table}\` ADD COLUMN is_delete TINYINT(1) NOT NULL DEFAULT 0 AFTER creator_user_id`
+    );
+  }
 
   const typeDt = await getColumnDataType(pool, table, "type");
   if (typeDt === "varchar" || typeDt === "char" || typeDt === "text") {
@@ -234,6 +239,7 @@ async function ensureSkinsTable() {
       image_url VARCHAR(2048) NOT NULL,
       thumb_url VARCHAR(2048) NOT NULL,
       creator_user_id BIGINT UNSIGNED NULL,
+      is_delete TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       KEY idx_type (type),
       KEY idx_created_at (created_at),
@@ -327,7 +333,7 @@ async function insertBook({ creatorUserId, title, categoryName, skinId }) {
       `
       SELECT image_url AS imageUrl, thumb_url AS thumbUrl
       FROM skins
-      WHERE id = ?
+      WHERE id = ? AND is_delete = 0
       LIMIT 1
     `,
       [skinId]
@@ -784,7 +790,7 @@ async function listSkins(filters) {
     }
     const pool = getMysqlPool();
 
-    const where = [];
+    const where = ["s.is_delete = 0"];
     const params = [];
 
     if (typeFilter !== null) {
@@ -833,6 +839,7 @@ async function listSkins(filters) {
         s.image_url AS imageUrl,
         s.thumb_url AS thumbUrl,
         s.creator_user_id AS creatorUserId,
+        s.is_delete AS isDelete,
         s.created_at AS createdAt,
         ${collectedSelect}
       FROM skins s
@@ -856,6 +863,9 @@ async function listSkins(filters) {
       }
       if (row && Object.prototype.hasOwnProperty.call(row, "isCollected")) {
         row.isCollected = Boolean(Number(row.isCollected));
+      }
+      if (row && Object.prototype.hasOwnProperty.call(row, "isDelete")) {
+        row.isDelete = Boolean(Number(row.isDelete));
       }
     }
 
@@ -974,7 +984,7 @@ async function listUserGallerySkins({ userId, type, page, pageSize }) {
     await ensureUserSkinsTable();
     const pool = getMysqlPool();
 
-    const where = ["us.user_id = ?"];
+    const where = ["us.user_id = ?", "s.is_delete = 0"];
     const params = [userId];
     if (typeFilter !== null) {
       where.push("s.type = ?");
@@ -1242,7 +1252,8 @@ async function deleteSkinByOwner({ skinId, ownerUserId }) {
         id,
         image_url AS imageUrl,
         thumb_url AS thumbUrl,
-        creator_user_id AS creatorUserId
+        creator_user_id AS creatorUserId,
+        is_delete AS isDelete
       FROM skins
       WHERE id = ?
       LIMIT 1
@@ -1262,10 +1273,12 @@ async function deleteSkinByOwner({ skinId, ownerUserId }) {
     if (creatorId === null || !Number.isFinite(owner) || creatorId !== owner) {
       return { forbidden: true };
     }
+    if (Boolean(Number(skin.isDelete))) {
+      return { alreadyDeleted: true };
+    }
 
-    await pool.query(`DELETE FROM user_skins WHERE skin_id = ?`, [skinId]);
     const [delResult] = await pool.query(
-      `DELETE FROM skins WHERE id = ? AND creator_user_id = ?`,
+      `UPDATE skins SET is_delete = 1 WHERE id = ? AND creator_user_id = ? AND is_delete = 0`,
       [skinId, owner]
     );
     const affected =
@@ -1320,6 +1333,146 @@ async function removeUserGallerySkin({ userId, userSkinId }) {
   }
 }
 
+function buildInClausePlaceholders(count) {
+  return Array.from({ length: count }).map(() => "?").join(", ");
+}
+
+async function deleteUserWithRelations({ userId }) {
+  const runOnce = async () => {
+    await ensureUsersTable();
+    await ensureCategoriesTable();
+    await ensureSkinsTable();
+    await ensureUserSkinsTable();
+    await ensureBooksTable();
+
+    const pool = getMysqlPool();
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [userRows] = await conn.query(
+        `
+        SELECT id
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+        [userId]
+      );
+      const user = Array.isArray(userRows) ? userRows[0] : null;
+      if (!user) {
+        await conn.rollback();
+        return { notFound: true };
+      }
+
+      const [skinRows] = await conn.query(
+        `
+        SELECT
+          id,
+          image_url AS imageUrl,
+          thumb_url AS thumbUrl
+        FROM skins
+        WHERE creator_user_id = ?
+      `,
+        [userId]
+      );
+      const skins = Array.isArray(skinRows) ? skinRows : [];
+      const skinIds = skins
+        .map((r) => Number(r.id))
+        .filter((v) => Number.isInteger(v) && v > 0);
+
+      let removedUserSkinsBySkin = 0;
+      if (skinIds.length > 0) {
+        const inSql = buildInClausePlaceholders(skinIds.length);
+        const [usBySkinResult] = await conn.query(
+          `DELETE FROM user_skins WHERE skin_id IN (${inSql})`,
+          skinIds
+        );
+        removedUserSkinsBySkin =
+          usBySkinResult && usBySkinResult.affectedRows != null
+            ? Number(usBySkinResult.affectedRows)
+            : 0;
+      }
+
+      const [skinResult] = await conn.query(
+        `DELETE FROM skins WHERE creator_user_id = ?`,
+        [userId]
+      );
+      const removedSkins =
+        skinResult && skinResult.affectedRows != null ? Number(skinResult.affectedRows) : 0;
+
+      const [bookResult] = await conn.query(
+        `DELETE FROM books WHERE creator_user_id = ?`,
+        [userId]
+      );
+      const removedBooks =
+        bookResult && bookResult.affectedRows != null ? Number(bookResult.affectedRows) : 0;
+
+      const [userSkinsResult] = await conn.query(
+        `DELETE FROM user_skins WHERE user_id = ?`,
+        [userId]
+      );
+      const removedUserSkinsByUser =
+        userSkinsResult && userSkinsResult.affectedRows != null
+          ? Number(userSkinsResult.affectedRows)
+          : 0;
+
+      const [categoryResult] = await conn.query(
+        `DELETE FROM categories WHERE creator_user_id = ?`,
+        [userId]
+      );
+      const removedCategories =
+        categoryResult && categoryResult.affectedRows != null
+          ? Number(categoryResult.affectedRows)
+          : 0;
+
+      const [userResult] = await conn.query(`DELETE FROM users WHERE id = ?`, [userId]);
+      const removedUsers =
+        userResult && userResult.affectedRows != null ? Number(userResult.affectedRows) : 0;
+
+      await conn.commit();
+      return {
+        ok: removedUsers > 0,
+        removed: {
+          users: removedUsers,
+          categories: removedCategories,
+          books: removedBooks,
+          skins: removedSkins,
+          userSkinsByUser: removedUserSkinsByUser,
+          userSkinsBySkin: removedUserSkinsBySkin,
+        },
+        files: skins,
+      };
+    } catch (err) {
+      try {
+        await conn.rollback();
+      } catch (_) {
+        // ignore rollback errors
+      }
+      throw err;
+    } finally {
+      conn.release();
+    }
+  };
+
+  try {
+    return await runOnce();
+  } catch (err) {
+    const noTable =
+      (err && err.code === "ER_NO_SUCH_TABLE") || (err && Number(err.errno) === 1146);
+    if (noTable) {
+      resetUsersTableCache();
+      resetCategoriesTableCache();
+      resetSkinsTableCache();
+      resetUserSkinsTableCache();
+      resetBooksTableCache();
+      return runOnce();
+    }
+    throw err;
+  }
+}
+
 module.exports = {
   getMysqlPool,
   ensureUsersTable,
@@ -1339,6 +1492,7 @@ module.exports = {
   addSkinToUserGallery,
   listUserGallerySkins,
   removeUserGallerySkin,
+  deleteUserWithRelations,
   deleteSkinByOwner,
   upsertAppleUser,
   initDatabaseIfConfigured,
